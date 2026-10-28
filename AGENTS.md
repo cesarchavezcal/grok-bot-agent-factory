@@ -4,19 +4,32 @@ This repository is an autonomous software factory powered by **T3 Code**, offici
 
 ---
 
-## 0. Project Initialization (`template init`)
+## 0. Creating a New Project & `template init`
 
-When an agent or **Grok Bot** creates a new repository from this template, run the idempotent bootstrap script first:
+> **Visibility Rule (GitHub Free):** While the template `cesarchavezcal/grok-bot-agent-factory` remains **PRIVATE**, **every working repository created from this template MUST be PUBLIC** (`--public`) so that GitHub Free permits branch protection (`ci` required status check) and `allow_auto_merge`.
+
+When an agent or **Grok Bot** creates a new working project from this template:
 
 ```bash
+# 1. Create the new working repository as PUBLIC from the private template
+gh repo create <name> --public --template cesarchavezcal/grok-bot-agent-factory --clone
+cd <name>
+
+# 2. Run idempotent bootstrap (or `./scripts/init.sh --create-repo <name>` from a local dir)
 ./scripts/init.sh
 ```
 
-What `./scripts/init.sh` does (safe to re-run at any time):
+What [`./scripts/init.sh`](scripts/init.sh) does (idempotent, safe to re-run at any time):
 1. **Tool & Auth Verification**: Verifies `git`, `gh` (authenticated), `node`, and `npx` with clear diagnostic messages.
-2. **Official Skills Sync**: Installs/updates the official skills pinned in [`skills-lock.json`](skills-lock.json) (`grill-with-docs`, `grilling`, `domain-modeling`, `wayfinder`, `to-spec`, `to-tickets` from `mattpocock/skills`, and `poteto-mode` from `cursor/plugins`) into `.agents/skills/`, and checks `.agents/skills/verify-app`.
+2. **Official Skills Sync**: Installs/restores the full official skills pinned by commit SHA and hash in [`skills-lock.json`](skills-lock.json):
+   - From `mattpocock/skills`: [`wayfinder`](.agents/skills/wayfinder/SKILL.md), [`grill-with-docs`](.agents/skills/grill-with-docs/SKILL.md) (full standalone skill with `ADR-FORMAT.md` & `CONTEXT-FORMAT.md`), [`grilling`](.agents/skills/grilling/SKILL.md), [`domain-modeling`](.agents/skills/domain-modeling/SKILL.md), [`to-spec`](.agents/skills/to-spec/SKILL.md), [`to-tickets`](.agents/skills/to-tickets/SKILL.md), and [`tdd`](.agents/skills/tdd/SKILL.md) (with `tests.md` & `mocking.md`).
+   - From `cursor/plugins` (`pstack`): [`poteto-mode`](.agents/skills/poteto-mode/SKILL.md) (including `playbooks/autopilot-full.md`).
+   - Checks local [`.agents/skills/verify-app/SKILL.md`](.agents/skills/verify-app/SKILL.md).
 3. **GitHub Labels**: Runs [`./scripts/setup-labels.sh`](scripts/setup-labels.sh) to ensure the `agent` trigger label and workflow state labels exist (and prints the Linear `agent` label note).
-4. **Branch Protection & Auto-Merge**: Configures the GitHub repository via `gh repo edit` and `gh api` to enable **Allow auto-merge**, **Squash merge**, **Delete branch on merge**, and **Branch protection on `main`** requiring the **`ci`** status check (`strict: true`).
+4. **Merge Policy & Branch Protection (`gh api`)**:
+   - Calls `gh api PATCH repos/<owner>/<repo>` to enable `allow_auto_merge=true`, `allow_squash_merge=true`, `allow_merge_commit=false`, `allow_rebase_merge=false`, and `delete_branch_on_merge=true`.
+   - Calls `gh api PUT repos/<owner>/<repo>/branches/main/protection` to protect `main` with the required status check **`ci`** (`strict: true`), linear history, and conversation resolution.
+   - If the repository is private on a GitHub Free plan (API returns `403 / Upgrade to GitHub Pro`), it prints an **explicit warning** with the command to make the working repo public (`gh repo edit <repo> --visibility public --accept-visibility-change-consequences`) and does not fail silently.
 5. **Factory Config & T3 Registration**: Updates the `app` slug in [`.factory/config.json`](.factory/config.json) and prints the optional T3 Code registration call (`t3_project_create`).
 
 ---
@@ -34,10 +47,10 @@ What `./scripts/init.sh` does (safe to re-run at any time):
 | Stage | Primary Skill(s) | Active Model (`provider::model`) | Pool |
 | :--- | :--- | :--- | :--- |
 | **Phase 0: Context Scout** | Repo exploration & context brief (`<2KB`) | `antigravity::gemini-3.8-flash-high` | `AGY_FAST` |
-| **Phase 1: Discovery & Grilling** | [`wayfinder`](.agents/skills/wayfinder/SKILL.md), [`grill-with-docs`](.agents/skills/grill-with-docs/SKILL.md) ([`grilling`](.agents/skills/grilling/SKILL.md) + [`domain-modeling`](.agents/skills/domain-modeling/SKILL.md)) | `antigravity::gemini-4-argon-high` | `AGY_PRO` |
+| **Phase 1: Discovery & Grilling** | [`wayfinder`](.agents/skills/wayfinder/SKILL.md), [`grill-with-docs`](.agents/skills/grill-with-docs/SKILL.md), [`grilling`](.agents/skills/grilling/SKILL.md), [`domain-modeling`](.agents/skills/domain-modeling/SKILL.md) | `antigravity::gemini-4-argon-high` | `AGY_PRO` |
 | **Phase 2: Spec & Tickets** | [`to-spec`](.agents/skills/to-spec/SKILL.md), [`to-tickets`](.agents/skills/to-tickets/SKILL.md) | `antigravity::gemini-4-argon-high` | `AGY_PRO` |
-| **Phase 3a: Build (UI / CRUD)** | [`poteto-mode`](.agents/skills/poteto-mode/SKILL.md) ([`autopilot-full`](.agents/skills/poteto-mode/playbooks/autopilot-full.md)) | `antigravity::gemini-3.8-flash-high` | `AGY_FAST` |
-| **Phase 3b: Build (Backend / Complex)** | [`poteto-mode`](.agents/skills/poteto-mode/SKILL.md) ([`autopilot-full`](.agents/skills/poteto-mode/playbooks/autopilot-full.md)) | `grok::grok-4.7-build-fast` (`reasoningEffort: medium`) | `GROK_WORK` |
+| **Phase 3a: Build (UI / CRUD)** | [`poteto-mode`](.agents/skills/poteto-mode/SKILL.md) ([`autopilot-full`](.agents/skills/poteto-mode/playbooks/autopilot-full.md)) + [`tdd`](.agents/skills/tdd/SKILL.md) | `antigravity::gemini-3.8-flash-high` | `AGY_FAST` |
+| **Phase 3b: Build (Backend / Complex)** | [`poteto-mode`](.agents/skills/poteto-mode/SKILL.md) ([`autopilot-full`](.agents/skills/poteto-mode/playbooks/autopilot-full.md)) + [`tdd`](.agents/skills/tdd/SKILL.md) | `grok::grok-4.7-build-fast` (`reasoningEffort: medium`) | `GROK_WORK` |
 | **Phase 4a: Runtime Verification** | [`verify-app`](.agents/skills/verify-app/SKILL.md) (`verify-<app>`) | `antigravity::gemini-3.8-flash-high` | `AGY_FAST` |
 | **Phase 4b: Independent Audit** | Adversarial diff & spec interrogation | `grok::grok-4.7` (`reasoningEffort: high`) | `GROK_AUDIT` |
 | **Rework Escalation (max 2)** | Scoped repair from 4a/4b findings | `antigravity::gemini-4-argon-high` (`maxRetries: 2`) | `AGY_PRO` |
@@ -63,7 +76,7 @@ During **Planning / Grilling** (`grill-with-docs` / `wayfinder`):
 
 ## 4. Build, Verification & Merge (`poteto-mode` · `Autopilot-full`)
 
-Execution follows the official pstack [`poteto-mode`](.agents/skills/poteto-mode/SKILL.md) skill and its [`Autopilot-full`](.agents/skills/poteto-mode/playbooks/autopilot-full.md) playbook:
+Execution follows the official pstack [`poteto-mode`](.agents/skills/poteto-mode/SKILL.md) skill, [`tdd`](.agents/skills/tdd/SKILL.md) seam discipline, and the [`Autopilot-full`](.agents/skills/poteto-mode/playbooks/autopilot-full.md) playbook:
 
 1. **Parallel Worktrees (Max Concurrency = 3)**:
    - Run at most **3 concurrent ticket owners** in isolated Git worktrees branched directly off `main` (never stacked).

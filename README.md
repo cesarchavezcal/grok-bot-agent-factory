@@ -4,19 +4,28 @@ Reusable, zero-API-key, Claude-free software factory template orchestrated with 
 
 ---
 
-## Quick Start (`template init`)
+## Quick Start (`template init` — Public Working Repos)
 
-When creating a new project from this template (manually or via **Grok Bot**), run the idempotent initialization script:
+> **Note on Visibility (GitHub Free):** This template repository (`cesarchavezcal/grok-bot-agent-factory`) is **PRIVATE**, but **all working repositories created from it MUST be PUBLIC** (`--public`) so GitHub Free enables branch protection (`ci` required status check) and `allow_auto_merge`.
+
+When creating a new project from this template (manually or via **Grok Bot**):
 
 ```bash
+# 1. Create a PUBLIC working repository from the template
+gh repo create <name> --public --template cesarchavezcal/grok-bot-agent-factory --clone
+cd <name>
+
+# 2. Run the idempotent initialization script
 ./scripts/init.sh
 ```
 
-`./scripts/init.sh` is safe to re-run at any time without duplicate side effects. It:
+*(Alternatively, inside an existing local checkout without a remote yet, run `./scripts/init.sh --create-repo <name>` to create the public GitHub repository and bootstrap it in one step.)*
+
+[`./scripts/init.sh`](scripts/init.sh) is 100% idempotent and safe to re-run at any time without duplicate side effects. It:
 1. Verifies required CLI tools (`git`, `gh` authenticated, `node`, `npx`).
-2. Installs/restores all official skills pinned in [`skills-lock.json`](skills-lock.json) into `.agents/skills/`.
+2. Installs/restores all official skills pinned by commit SHA and hash in [`skills-lock.json`](skills-lock.json) into `.agents/skills/`.
 3. Creates/updates GitHub repository labels (including `agent`) via [`./scripts/setup-labels.sh`](scripts/setup-labels.sh).
-4. Configures GitHub merge policy (**Allow auto-merge**, **Squash merge only**, **Delete branch on merge**) and **Branch protection on `main`** with the required status check **`ci`**.
+4. Configures GitHub merge policy via `gh api PATCH` (`allow_auto_merge=true`, `allow_squash_merge=true`, `delete_branch_on_merge=true`) and **Branch protection on `main`** via `gh api PUT` with the required status check **`ci`**. If a repository is private on GitHub Free (`403 / upgrade`), it emits a clear, explicit warning instead of failing silently.
 5. Updates the project slug in [`.factory/config.json`](.factory/config.json) and prints the optional T3 Code project registration command.
 
 See [`docs/setup.md`](docs/setup.md) for manual GitHub/Linear setup details and [`AGENTS.md`](AGENTS.md) for the complete agent operating contract.
@@ -28,16 +37,18 @@ See [`docs/setup.md`](docs/setup.md) for manual GitHub/Linear setup details and 
 1. **Intake (`agent` label only)**:
    - Only GitHub Issues or Linear Issues labeled with **`agent`** are ingested. Everything else is ignored.
 2. **Planning (`mattpocock/skills`)**:
-   - Uses official skills installed from `mattpocock/skills` and locked in [`skills-lock.json`](skills-lock.json):
+   - Uses the full official skills installed from `mattpocock/skills` and locked in [`skills-lock.json`](skills-lock.json):
      - [`wayfinder`](.agents/skills/wayfinder/SKILL.md)
-     - [`grill-with-docs`](.agents/skills/grill-with-docs/SKILL.md) ([`grilling`](.agents/skills/grilling/SKILL.md) + [`domain-modeling`](.agents/skills/domain-modeling/SKILL.md))
+     - [`grill-with-docs`](.agents/skills/grill-with-docs/SKILL.md) (full standalone skill with `ADR-FORMAT.md` & `CONTEXT-FORMAT.md`)
+     - [`grilling`](.agents/skills/grilling/SKILL.md) & [`domain-modeling`](.agents/skills/domain-modeling/SKILL.md)
      - [`to-spec`](.agents/skills/to-spec/SKILL.md)
      - [`to-tickets`](.agents/skills/to-tickets/SKILL.md)
+     - [`tdd`](.agents/skills/tdd/SKILL.md) (seam-based red-green loop with `tests.md` & `mocking.md`)
 3. **Grilling (Deduce First, Ask 2–3 Questions & Stop)**:
    - The agent resolves everything deducible from the codebase and docs first.
    - Any remaining non-deducible ambiguity is asked in a **single numbered block of 2–3 independent questions**, and the agent **STOPS** waiting for the reply via **Grok Bot**.
 4. **Build & Merge (`pstack` `poteto-mode` · `Autopilot-full`)**:
-   - Uses official [`poteto-mode`](.agents/skills/poteto-mode/SKILL.md) (`cursor/plugins`, locked in [`skills-lock.json`](skills-lock.json)) under the [`Autopilot-full`](.agents/skills/poteto-mode/playbooks/autopilot-full.md) playbook.
+   - Uses official [`poteto-mode`](.agents/skills/poteto-mode/SKILL.md) (`cursor/plugins`, locked in [`skills-lock.json`](skills-lock.json)) under the [`Autopilot-full`](.agents/skills/poteto-mode/playbooks/autopilot-full.md) playbook + [`tdd`](.agents/skills/tdd/SKILL.md).
    - Runs up to **3 concurrent worktrees** off `main`.
    - Merges via **squash merge** only when **`ci` is green** AND **independent verification** ([`verify-app`](.agents/skills/verify-app/SKILL.md) runtime proof + `grok-4.7` adversarial interrogation) passes.
 
@@ -71,6 +82,7 @@ See [`docs/setup.md`](docs/setup.md) for manual GitHub/Linear setup details and 
 │   ├── domain-modeling/
 │   ├── to-spec/
 │   ├── to-tickets/
+│   ├── tdd/
 │   ├── poteto-mode/
 │   └── verify-app/
 ├── .cursor/

@@ -1,12 +1,26 @@
 # Setup & Repository Protection Guide
 
-When a new repository is created from this template (either manually or by **Grok Bot**), run the idempotent bootstrap command:
+> **Important (GitHub Free Policy):** The template repository `cesarchavezcal/grok-bot-agent-factory` stays **PRIVATE**, but **all working repositories created from this template MUST be created as PUBLIC** (`--public`). GitHub Free only supports Branch Protection (`ci` required check) and Auto-Merge on public repositories.
+
+---
+
+## 0. Create a New Working Repository from the Template (`PUBLIC`)
+
+When an agent or **Grok Bot** creates a new working project from this template:
 
 ```bash
+gh repo create <name> --public --template cesarchavezcal/grok-bot-agent-factory --clone
+cd <name>
 ./scripts/init.sh
 ```
 
-Below is what `./scripts/init.sh` configures and how to verify or run each step manually.
+Or if initializing from an existing local directory without a remote yet:
+
+```bash
+./scripts/init.sh --create-repo <name>
+```
+
+`./scripts/init.sh` is **100% idempotent** and safe to re-run at any time. If a repository happens to be private on a GitHub Free plan (where the GitHub API returns HTTP `403 / Upgrade to GitHub Pro`), `./scripts/init.sh` emits an explicit warning with the exact command to switch visibility to public without failing silently.
 
 ---
 
@@ -31,25 +45,20 @@ In Linear (**Workspace Settings → Labels**), create a label named **`agent`** 
 
 ---
 
-## 2. Allow Auto-Merge & Squash Merge
+## 2. Allow Auto-Merge, Squash Merge & Delete Branch on Merge
 
 The `Autopilot-full` playbook merges PRs via **squash merge** once both the **`ci`** status check and independent verification (`verify-app` + Grok 4.7 interrogation) pass.
 
-### CLI (`gh`)
+### CLI (`gh api PATCH`)
 ```bash
-gh repo edit \
-  --enable-squash-merge \
-  --enable-auto-merge \
-  --delete-branch-on-merge \
-  --enable-merge-commit=false \
-  --enable-rebase-merge=false
+REPO="$(gh repo view --json nameWithOwner --jq '.nameWithOwner')"
+gh api --method PATCH "repos/$REPO" \
+  -F allow_auto_merge=true \
+  -F allow_squash_merge=true \
+  -F allow_merge_commit=false \
+  -F allow_rebase_merge=false \
+  -F delete_branch_on_merge=true
 ```
-
-### GitHub Web UI
-1. Go to **Settings → General → Pull Requests**.
-2. Enable **Allow squash merging** (disable merge commits and rebase merging if you want strict squash-only history).
-3. Enable **Allow auto-merge**.
-4. Enable **Automatically delete head branches**.
 
 ---
 
@@ -57,7 +66,7 @@ gh repo edit \
 
 `.github/workflows/ci.yml` defines a job with the stable check name **`ci`**.
 
-### CLI (`gh api`)
+### CLI (`gh api PUT`)
 ```bash
 REPO="$(gh repo view --json nameWithOwner --jq '.nameWithOwner')"
 gh api --method PUT "repos/$REPO/branches/main/protection" --input - <<'EOF'
@@ -77,13 +86,13 @@ gh api --method PUT "repos/$REPO/branches/main/protection" --input - <<'EOF'
 EOF
 ```
 
-### GitHub Web UI
-1. Go to **Settings → Branches → Add branch protection rule** (or Rulesets) for `main`.
-2. Enable **Require a pull request before merging** and **Require conversation resolution before merging**.
-3. Enable **Require status checks to pass before merging**:
-   - Check **Require branches to be up to date before merging**.
-   - Add status check: **`ci`**.
-4. Enable **Require linear history**.
+### If the Repo Was Created Private on GitHub Free
+If the API returns HTTP `403` (`Upgrade to GitHub Pro or make this repository public to enable this feature`), make the working repository public and re-run `./scripts/init.sh`:
+
+```bash
+gh repo edit "$REPO" --visibility public --accept-visibility-change-consequences
+./scripts/init.sh
+```
 
 ---
 

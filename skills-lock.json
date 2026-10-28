@@ -3,43 +3,56 @@
   "skills": {
     "domain-modeling": {
       "source": "mattpocock/skills",
+      "ref": "59db609eb1e18aaf59b63284d0e52255aff0c63c",
       "sourceType": "github",
       "skillPath": "skills/engineering/domain-modeling/SKILL.md",
       "computedHash": "b3eb40152b81f0c98fd2095a023c019452dbdce56f7540cc67fece2972db8369"
     },
     "grill-with-docs": {
       "source": "mattpocock/skills",
+      "ref": "e74f0061bb67222181640effa98c675bdb2fdaa7",
       "sourceType": "github",
       "skillPath": "skills/engineering/grill-with-docs/SKILL.md",
-      "computedHash": "35e62aa423aaeab6a414bcac273f56dfb17802ef2334b41b6a3b00f28196c8cf"
+      "computedHash": "1adf321072f53cce3dcaf5357d91b8230d4aa647bb8a51756745337a6ee567b8"
     },
     "grilling": {
       "source": "mattpocock/skills",
+      "ref": "59db609eb1e18aaf59b63284d0e52255aff0c63c",
       "sourceType": "github",
       "skillPath": "skills/productivity/grilling/SKILL.md",
       "computedHash": "ef1641a2047b71b60f1942cd35efb47d3afc9d584dff5a0b01f8c7db923aaa08"
     },
     "poteto-mode": {
       "source": "cursor/plugins",
-      "ref": "main",
+      "ref": "0f77cd5dab1e006de02d6ad221d5620de026473a",
       "sourceType": "github",
       "skillPath": "pstack/skills/poteto-mode/SKILL.md",
       "computedHash": "d4cf736a382824cf8ee4ed26b9048dd037f6065cceac107f649746dd92aae7e5"
     },
+    "tdd": {
+      "source": "mattpocock/skills",
+      "ref": "59db609eb1e18aaf59b63284d0e52255aff0c63c",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/tdd/SKILL.md",
+      "computedHash": "daf55026f456af104a72fa43247f7bcec89e5127316dc5b1b8d675d6a9d8ce94"
+    },
     "to-spec": {
       "source": "mattpocock/skills",
+      "ref": "59db609eb1e18aaf59b63284d0e52255aff0c63c",
       "sourceType": "github",
       "skillPath": "skills/engineering/to-spec/SKILL.md",
       "computedHash": "3fa1a0695d4ea242fae9e569e4d22aa1788623197abb33bfadafae7315789bbf"
     },
     "to-tickets": {
       "source": "mattpocock/skills",
+      "ref": "59db609eb1e18aaf59b63284d0e52255aff0c63c",
       "sourceType": "github",
       "skillPath": "skills/engineering/to-tickets/SKILL.md",
       "computedHash": "5f871bdc46a9212222214ba399be4965374208af1bd7f48f1271bef72841dd31"
     },
     "wayfinder": {
       "source": "mattpocock/skills",
+      "ref": "59db609eb1e18aaf59b63284d0e52255aff0c63c",
       "sourceType": "github",
       "skillPath": "skills/engineering/wayfinder/SKILL.md",
       "computedHash": "71d1296ae9f1ea0397f385f72d11ca3473827f5d067df4d06c58eb03377a57ce"

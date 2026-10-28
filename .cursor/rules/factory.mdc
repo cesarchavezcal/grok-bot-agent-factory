@@ -7,18 +7,22 @@ alwaysApply: true
 
 This repository follows the **Grok Bot Agent Factory** autonomous workflow. Read `AGENTS.md` and `.factory/config.json` before acting.
 
+## 0. Working Repository Creation & Bootstrap (`template init`)
+- New working repositories created from this template MUST be created as **PUBLIC** (`gh repo create <name> --public --template cesarchavezcal/grok-bot-agent-factory --clone`) so GitHub Free allows branch protection (`ci` required check) and auto-merge (`allow_auto_merge`).
+- Run `./scripts/init.sh` (idempotent) to install/verify locked skills, create labels (`agent`, etc.), enable squash + auto-merge, and protect `main`.
+
 ## 1. Intake Gate (`agent` Label Only)
 - Process **only** GitHub Issues or Linear Issues carrying the `agent` label. Ignore all other issues.
 - Track active work in `.factory/work-items/<id>.json` (conforming to `.factory/work-item.schema.json`). Do not commit runtime work-item instances unless requested.
 
 ## 2. Planning & Grilling (Official `mattpocock/skills`)
-- Use the official skills pinned in `skills-lock.json` under `.agents/skills/`: `wayfinder`, `grill-with-docs` (`grilling` + `domain-modeling`), `to-spec`, and `to-tickets`.
+- Use the official skills pinned in `skills-lock.json` under `.agents/skills/`: `wayfinder`, `grill-with-docs`, `grilling`, `domain-modeling`, `to-spec`, `to-tickets`, and `tdd`.
 - **Grilling Rule**:
   1. Deduce everything possible from the codebase, tests, and existing docs first. Never ask what you can read or verify yourself.
   2. If non-deducible product or architectural ambiguities remain, post a **single numbered block of 2 to 3 independent questions**, set `waitingOn: "human"` (`status: "blocked"`), and **STOP immediately** to wait for the human reply via the external dispatcher (**Grok Bot**).
 
 ## 3. Build, Verification & Merge (`poteto-mode` · `Autopilot-full`)
-- Building runs exclusively through official pstack `/poteto-mode` (`.agents/skills/poteto-mode/SKILL.md`) using the **`Autopilot-full`** playbook (`.agents/skills/poteto-mode/playbooks/autopilot-full.md`).
+- Building runs exclusively through official pstack `/poteto-mode` (`.agents/skills/poteto-mode/SKILL.md`) using the **`Autopilot-full`** playbook (`.agents/skills/poteto-mode/playbooks/autopilot-full.md`) and seam-first [`tdd`](.agents/skills/tdd/SKILL.md).
 - **Max Concurrency**: `3` isolated Git worktrees off `main` in parallel (never stacked).
 - **Proof & Merge Gate**:
   1. Green CI check (`ci`).

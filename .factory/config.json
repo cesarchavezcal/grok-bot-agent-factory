@@ -3,6 +3,10 @@
   "verifySkill": "verify-app",
   "baseBranch": "main",
   "autonomy": "autopilot-full",
+  "repository": {
+    "workingRepoVisibility": "public",
+    "templateRepo": "cesarchavezcal/grok-bot-agent-factory"
+  },
   "intake": {
     "sources": ["github", "linear"],
     "requiredLabel": "agent",
@@ -10,7 +14,7 @@
     "maxConcurrency": 3
   },
   "planning": {
-    "skills": ["wayfinder", "grill-with-docs", "to-spec", "to-tickets"],
+    "skills": ["wayfinder", "grill-with-docs", "grilling", "domain-modeling", "to-spec", "to-tickets", "tdd"],
     "grilling": {
       "deduceFromCodeAndDocsFirst": true,
       "minQuestionsPerBlock": 2,
@@ -21,6 +25,7 @@
   },
   "builder": {
     "skill": "poteto-mode",
+    "tddSkill": "tdd",
     "playbook": "autopilot-full",
     "maxConcurrency": 3,
     "worktreeIsolation": true
