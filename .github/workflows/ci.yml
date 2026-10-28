@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate Factory Configuration & Invariants
+        run: |
+          test -f .factory/config.json
+          test -f .factory/work-item.schema.json
+          test -f skills-lock.json
+          test -f AGENTS.md
+          node -e '
+            const fs = require("fs");
+            const cfg = JSON.parse(fs.readFileSync(".factory/config.json", "utf8"));
+            if (!cfg.invariants?.strictZeroCost || !cfg.invariants?.disallowClaude) {
+              throw new Error("Factory invariants violated in .factory/config.json");
+            }
+            if (cfg.intake?.requiredLabel !== "agent") {
+              throw new Error("intake.requiredLabel must be agent");
+            }
+            console.log("Factory config invariants OK.");
+          '
+
+      - name: Run Node.js lint / test / build (if package.json exists)
+        if: hashFiles('package.json') != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Execute Node.js checks
+        if: hashFiles('package.json') != ''
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+          npm run lint --if-present
+          npm test --if-present
+          npm run build --if-present
+
+      - name: Run Python checks (if pyproject.toml or requirements.txt exists)
+        if: hashFiles('pyproject.toml', 'requirements.txt') != ''
+        run: |
+          python3 -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if command -v pytest >/dev/null 2>&1; then pytest; fi
+
+      - name: Run Go checks (if go.mod exists)
+        if: hashFiles('go.mod') != ''
+        run: |
+          go vet ./...
+          go test ./...
+
+      - name: Run Rust checks (if Cargo.toml exists)
+        if: hashFiles('Cargo.toml') != ''
+        run: |
+          cargo test

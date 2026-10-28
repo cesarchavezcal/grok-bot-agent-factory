@@ -1,0 +1,21 @@
+{
+  "id": "gh-1-example",
+  "source": "https://github.com/<owner>/<repo>/issues/1",
+  "label": "agent",
+  "stage": "building",
+  "status": "open",
+  "builder": "poteto-mode",
+  "playbook": "autopilot-full",
+  "primarySkill": "poteto-mode",
+  "assignedModel": "antigravity::gemini-3.8-flash-high",
+  "planPath": "docs/specs/example-feature.md",
+  "ticketIds": ["T-1"],
+  "verifySkill": "verify-app",
+  "evidenceDir": "artifacts/gh-1-example",
+  "pendingQuestions": [],
+  "blockers": [],
+  "decisions": [],
+  "retryCount": 0,
+  "prUrl": "",
+  "waitingOn": "none"
+}

@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FactoryWorkItem",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source",
+    "label",
+    "stage",
+    "status",
+    "builder",
+    "playbook",
+    "primarySkill",
+    "planPath",
+    "ticketIds",
+    "verifySkill",
+    "evidenceDir",
+    "pendingQuestions",
+    "blockers",
+    "decisions",
+    "retryCount",
+    "waitingOn"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique work-item identifier (e.g. gh-42 or LIN-101)"
+    },
+    "source": {
+      "type": "string",
+      "description": "Issue URL or tracker identifier (GitHub Issue or Linear Issue)"
+    },
+    "label": {
+      "type": "string",
+      "const": "agent",
+      "description": "Required intake trigger label"
+    },
+    "stage": {
+      "type": "string",
+      "enum": [
+        "intake",
+        "scouting",
+        "grilling",
+        "planning",
+        "building",
+        "verifying",
+        "interrogating",
+        "rework",
+        "merging",
+        "complete",
+        "cancelled"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["open", "blocked", "complete", "cancelled"]
+    },
+    "builder": {
+      "type": "string",
+      "const": "poteto-mode"
+    },
+    "playbook": {
+      "type": "string",
+      "const": "autopilot-full"
+    },
+    "primarySkill": {
+      "type": "string"
+    },
+    "assignedModel": {
+      "type": "string",
+      "description": "Currently active provider::model slug"
+    },
+    "planPath": {
+      "type": "string"
+    },
+    "ticketIds": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "verifySkill": {
+      "type": "string"
+    },
+    "evidenceDir": {
+      "type": "string"
+    },
+    "pendingQuestions": {
+      "type": "array",
+      "maxItems": 3,
+      "items": { "type": "string" },
+      "description": "Numbered block of 2-3 independent clarification questions awaiting Grok Bot human response"
+    },
+    "blockers": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "decisions": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "retryCount": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 2,
+      "description": "Number of rework attempts (escalated to antigravity::gemini-4-argon-high, max 2)"
+    },
+    "prUrl": {
+      "type": "string"
+    },
+    "waitingOn": {
+      "type": "string",
+      "enum": ["none", "human", "ci", "verify", "merge", "blocked"]
+    }
+  }
+}

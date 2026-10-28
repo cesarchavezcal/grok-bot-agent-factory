@@ -1,0 +1,106 @@
+{
+  "app": "app",
+  "verifySkill": "verify-app",
+  "baseBranch": "main",
+  "autonomy": "autopilot-full",
+  "intake": {
+    "sources": ["github", "linear"],
+    "requiredLabel": "agent",
+    "ignoreUnlabeled": true,
+    "maxConcurrency": 3
+  },
+  "planning": {
+    "skills": ["wayfinder", "grill-with-docs", "to-spec", "to-tickets"],
+    "grilling": {
+      "deduceFromCodeAndDocsFirst": true,
+      "minQuestionsPerBlock": 2,
+      "maxQuestionsPerBlock": 3,
+      "stopAndWaitForHuman": true,
+      "dispatcher": "grok-bot"
+    }
+  },
+  "builder": {
+    "skill": "poteto-mode",
+    "playbook": "autopilot-full",
+    "maxConcurrency": 3,
+    "worktreeIsolation": true
+  },
+  "delivery": {
+    "mergeMethod": "squash",
+    "deleteBranchOnMerge": true,
+    "allowAutoMerge": true,
+    "requireGreenCI": true,
+    "requiredCheckName": "ci",
+    "requireIndependentVerification": true
+  },
+  "models": {
+    "scout": {
+      "pool": "AGY_FAST",
+      "providerInstanceId": "antigravity",
+      "model": "gemini-3.8-flash-high",
+      "fallback": "gemini-3.8-flash-medium",
+      "role": "context-scout"
+    },
+    "planner": {
+      "pool": "AGY_PRO",
+      "providerInstanceId": "antigravity",
+      "model": "gemini-4-argon-high",
+      "fallback": "gemini-3.8-flash-high",
+      "role": "spec-and-plan"
+    },
+    "builderStandard": {
+      "pool": "AGY_FAST",
+      "providerInstanceId": "antigravity",
+      "model": "gemini-3.8-flash-high",
+      "fallback": "grok-4.7-build-fast",
+      "scope": ["ui", "crud", "frontend", "docs", "chore"],
+      "role": "implementation"
+    },
+    "builderComplex": {
+      "pool": "GROK_WORK",
+      "providerInstanceId": "grok",
+      "model": "grok-4.7-build-fast",
+      "options": { "reasoningEffort": "medium" },
+      "scope": ["backend", "db", "database", "sql", "concurrency", "security", "algorithm", "state-machine", "architecture"],
+      "role": "implementation"
+    },
+    "rework": {
+      "pool": "AGY_PRO",
+      "providerInstanceId": "antigravity",
+      "model": "gemini-4-argon-high",
+      "maxRetries": 2,
+      "role": "rework-escalation"
+    },
+    "verifier": {
+      "pool": "AGY_FAST",
+      "providerInstanceId": "antigravity",
+      "model": "gemini-3.8-flash-high",
+      "fallback": "gemini-3.8-flash-low",
+      "role": "runtime-verify"
+    },
+    "interrogator": {
+      "pool": "GROK_AUDIT",
+      "providerInstanceId": "grok",
+      "model": "grok-4.7",
+      "options": { "reasoningEffort": "high" },
+      "role": "adversarial-audit"
+    }
+  },
+  "gates": {
+    "requireRuntimeVerify": true,
+    "requireAdversarialInterrogate": true,
+    "maxRetries": 2,
+    "maxContextBriefBytes": 2048
+  },
+  "invariants": {
+    "strictZeroCost": true,
+    "disallowClaude": true,
+    "forbidEnvKeys": [
+      "GEMINI_API_KEY",
+      "XAI_API_KEY",
+      "CURSOR_API_KEY",
+      "ANTHROPIC_API_KEY",
+      "OPENAI_API_KEY"
+    ]
+  }
+}

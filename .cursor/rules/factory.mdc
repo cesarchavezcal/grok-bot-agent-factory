@@ -1,0 +1,36 @@
+---
+description: Grok Bot Agent Factory — Multi-Model Autonomous Pipeline (Matt Pocock + pstack Autopilot-full)
+alwaysApply: true
+---
+
+# Grok Bot Agent Factory Rules
+
+This repository follows the **Grok Bot Agent Factory** autonomous workflow. Read `AGENTS.md` and `.factory/config.json` before acting.
+
+## 1. Intake Gate (`agent` Label Only)
+- Process **only** GitHub Issues or Linear Issues carrying the `agent` label. Ignore all other issues.
+- Track active work in `.factory/work-items/<id>.json` (conforming to `.factory/work-item.schema.json`). Do not commit runtime work-item instances unless requested.
+
+## 2. Planning & Grilling (Official `mattpocock/skills`)
+- Use the official skills pinned in `skills-lock.json` under `.agents/skills/`: `wayfinder`, `grill-with-docs` (`grilling` + `domain-modeling`), `to-spec`, and `to-tickets`.
+- **Grilling Rule**:
+  1. Deduce everything possible from the codebase, tests, and existing docs first. Never ask what you can read or verify yourself.
+  2. If non-deducible product or architectural ambiguities remain, post a **single numbered block of 2 to 3 independent questions**, set `waitingOn: "human"` (`status: "blocked"`), and **STOP immediately** to wait for the human reply via the external dispatcher (**Grok Bot**).
+
+## 3. Build, Verification & Merge (`poteto-mode` · `Autopilot-full`)
+- Building runs exclusively through official pstack `/poteto-mode` (`.agents/skills/poteto-mode/SKILL.md`) using the **`Autopilot-full`** playbook (`.agents/skills/poteto-mode/playbooks/autopilot-full.md`).
+- **Max Concurrency**: `3` isolated Git worktrees off `main` in parallel (never stacked).
+- **Proof & Merge Gate**:
+  1. Green CI check (`ci`).
+  2. Independent runtime verification via `.agents/skills/verify-app` (or `verify-<app>`) with `exitCode === 0` and saved evidence in `artifacts/<work-item-id>/`.
+  3. Independent cross-model adversarial interrogation on `grok::grok-4.7` (`reasoningEffort: "high"`) returning `PASS`.
+  4. **Squash merge** (`gh pr merge --squash --delete-branch`).
+
+## 4. Model Routing & Rework Escalation (Zero API Keys, Zero Claude)
+- **Scout & Runtime Verify**: `antigravity::gemini-3.8-flash-high` (`AGY_FAST`).
+- **Spec & Plan**: `antigravity::gemini-4-argon-high` (`AGY_PRO`).
+- **UI / CRUD / Standard Build**: `antigravity::gemini-3.8-flash-high` (`AGY_FAST`).
+- **Backend / Complex Logic Build** (`db`, `sql`, `concurrency`, `security`, `algorithm`, `state-machine`, `architecture`): `grok::grok-4.7-build-fast` (`GROK_WORK`).
+- **Independent Audit / Interrogation**: `grok::grok-4.7` (`GROK_AUDIT`, `reasoningEffort: "high"`).
+- **Rework Escalation**: On verification or audit failure, escalate rework to **`antigravity::gemini-4-argon-high`** (`AGY_PRO`) — distinct from the `grok-4.7` auditor — for a maximum of **2 attempts** (`maxRetries: 2`). Stop and block if still failing after 2 attempts.
+- **Invariants**: Never use Claude models (`disallowClaude: true`) and never require paid API keys (`strictZeroCost: true`).
