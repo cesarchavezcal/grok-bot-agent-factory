@@ -31,6 +31,20 @@ cd <name>
 
 See [`docs/setup.md`](docs/setup.md) for manual GitHub/Linear setup details and [`AGENTS.md`](AGENTS.md) for the complete agent operating contract.
 
+### Syncing Upstream Template Updates (`sync-template.sh`)
+
+Inside any working repository derived from this template, pull the latest managed workflows, scripts, skills, and rules from the private `cesarchavezcal/grok-bot-agent-factory` template and open a PR:
+
+```bash
+./scripts/sync-template.sh                  # Sync from `main` (default)
+./scripts/sync-template.sh --ref <ref>      # Sync from a specific branch, tag, or SHA
+./scripts/sync-template.sh --dry-run        # Print diff summary without creating a branch/PR
+```
+
+- **Explicit Manifest ([`.factory/template-sync.json`](.factory/template-sync.json))**: Syncs only managed factory paths (`.factory/template-sync.json`, `.github/workflows/*`, `scripts/*`, `.agents/skills/*`, `.cursor/rules`, `.cursor/agents`, `AGENTS.md`, `skills-lock.json`, `.factory/work-item.schema.json`, `.factory/WORK-ITEM.example.json`) and never touches application code or `.factory/config.json`.
+- **Idempotent**: Prints a diff summary and creates no branch or PR when nothing changed.
+- **Version Tracking ([`.factory/template-version`](.factory/template-version))**: Records the synced 40-character template commit SHA.
+
 ---
 
 ## Workflow Overview
@@ -92,6 +106,8 @@ See [`docs/setup.md`](docs/setup.md) for manual GitHub/Linear setup details and 
 │   └── agents/                                  # Builder (Flash/Grok) & Interrogator (Grok) profiles
 ├── .factory/
 │   ├── config.json                              # Generic factory & model routing configuration
+│   ├── template-sync.json                       # Explicit manifest of managed template sync paths
+│   ├── template-version                         # Synced template commit SHA
 │   ├── work-item.schema.json                    # Work-item JSON schema
 │   ├── WORK-ITEM.example.json                   # Work-item example
 │   └── work-items/.gitkeep                      # Runtime work-items directory
@@ -101,8 +117,9 @@ See [`docs/setup.md`](docs/setup.md) for manual GitHub/Linear setup details and 
 │   └── workflows/
 │       ├── ci.yml                               # Generic CI workflow (stable check name: `ci`)
 │       └── notify-grok.yml                      # Dispatches `agent`-labeled issues to Grok Bot webhook
-├── docs/setup.md                                # Branch protection, auto-merge, secrets, and labels guide
+├── docs/setup.md                                # Branch protection, auto-merge, secrets, labels & sync guide
 └── scripts/
     ├── init.sh                                  # Idempotent `template init` bootstrap script
-    └── setup-labels.sh                          # Idempotent GitHub labels script (+ Linear note)
+    ├── setup-labels.sh                          # Idempotent GitHub labels script (+ Linear note)
+    └── sync-template.sh                         # Idempotent upstream template sync & PR script
 ```
