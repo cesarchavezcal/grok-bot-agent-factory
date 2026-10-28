@@ -54,7 +54,7 @@ Inside any working repository derived from this template (or from a template che
 
 1. **Intake (`agent` label only)**:
    - Only GitHub Issues or Linear Issues labeled with **`agent`** are ingested. Everything else is ignored.
-   - [`.github/workflows/notify-grok.yml`](.github/workflows/notify-grok.yml) triggers on `issues` (`opened`, `labeled`) when the `agent` label is present and `POST`s the GitHub event payload to `GROK_WEBHOOK_URL` (with `Authorization: $GROK_WEBHOOK_AUTH`), exiting `0` with a `::notice::` if either secret is unset.
+   - [`.github/workflows/notify-grok.yml`](.github/workflows/notify-grok.yml) triggers on `issues` (`types: [labeled]`) when `github.event.label.name == 'agent'` and `POST`s the GitHub event payload to `GROK_WEBHOOK_URL` (with `Authorization: $GROK_WEBHOOK_AUTH`), exiting `0` with a `::notice::` if either secret is unset.
 2. **Planning (`mattpocock/skills`)**:
    - Uses the full official skills installed from `mattpocock/skills` and locked in [`skills-lock.json`](skills-lock.json):
      - [`wayfinder`](.agents/skills/wayfinder/SKILL.md)
