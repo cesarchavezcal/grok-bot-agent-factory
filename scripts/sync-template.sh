@@ -4,6 +4,10 @@
 # repository, records the synced template commit SHA in `.factory/template-version`,
 # and opens a pull request if any managed files changed.
 #
+# First-time sync friendly: if the target repository does not yet have
+# `.factory/template-sync.json`, the manifest is fetched from the template ref
+# via `gh` auth, used to drive the sync, and written into the target repository.
+#
 # Idempotent: prints a diff summary and creates NO branch or PR when nothing changed.
 # Never modifies application code or `.factory/config.json` app settings.
 #
@@ -11,26 +15,28 @@
 #   ./scripts/sync-template.sh [options]
 #
 # Options:
+#   --target <path>          Target repository path to sync into (default: repo containing this script)
 #   --ref <git-ref>          Template branch, tag, or commit SHA to sync from (default: main)
-#   --repo <owner/name>      Template repository (default: from .factory/template-sync.json)
+#   --repo <owner/name>      Template repository (default: from .factory/template-sync.json or cesarchavezcal/grok-bot-agent-factory)
 #   --branch <branch-name>   Branch name to create (default: chore/template-sync-<short-sha>)
-#   --base <base-branch>     Base branch in working repo (default: main)
+#   --base <base-branch>     Base branch in target repo (default: main)
 #   --source-dir <path>      Optional local template checkout (for testing; skips gh repo clone)
 #   --dry-run                Print diff summary and revert without creating a branch or PR
-#   --allow-template-self    Allow running inside the template repo itself (used with --dry-run)
+#   --allow-template-self    Allow syncing when the target repo IS the template repo (used with --dry-run)
 #   -h, --help               Show this help message
 
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$ROOT_DIR"
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CALLER_DIR="$(pwd)"
 
 MANIFEST_FILE=".factory/template-sync.json"
 
 usage() {
-  sed -n '2,22p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "${BASH_SOURCE[0]}"
 }
 
+TARGET_DIR=""
 TEMPLATE_REPO=""
 TARGET_REF=""
 SYNC_BRANCH=""
@@ -41,6 +47,14 @@ ALLOW_SELF=0
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
+    --target)
+      if [ -z "${2:-}" ]; then
+        echo "❌ --target requires a directory path." >&2
+        exit 1
+      fi
+      TARGET_DIR="$2"
+      shift 2
+      ;;
     --ref)
       TARGET_REF="${2:-}"
       shift 2
@@ -86,7 +100,7 @@ echo "🔄 Grok Bot Agent Factory — template sync"
 echo "============================================================"
 
 # ------------------------------------------------------------------------------
-# 1. Verify required tools & clean working tree
+# 1. Verify required tools, resolve target repo & verify clean working tree
 # ------------------------------------------------------------------------------
 for cmd in git gh node; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
@@ -95,22 +109,55 @@ for cmd in git gh node; do
   fi
 done
 
-if [ -z "$SOURCE_DIR" ]; then
+if [ -n "$SOURCE_DIR" ]; then
+  if [ ! -d "$SOURCE_DIR" ]; then
+    echo "❌ --source-dir '$SOURCE_DIR' does not exist." >&2
+    exit 1
+  fi
+  SOURCE_DIR="$(cd "$SOURCE_DIR" && pwd)"
+else
   if ! gh auth status >/dev/null 2>&1; then
     echo "❌ gh CLI is not authenticated. Run 'gh auth login' to access the private template." >&2
     exit 1
   fi
 fi
 
-if [ ! -f "$MANIFEST_FILE" ]; then
-  echo "❌ Manifest file '$MANIFEST_FILE' not found in $(pwd)." >&2
+if [ -n "$TARGET_DIR" ]; then
+  if [ ! -d "$TARGET_DIR" ]; then
+    echo "❌ --target directory '$TARGET_DIR' does not exist." >&2
+    exit 1
+  fi
+  TARGET_DIR="$(cd "$CALLER_DIR" && cd "$TARGET_DIR" && pwd)"
+else
+  TARGET_DIR="$SCRIPT_ROOT"
+fi
+
+cd "$TARGET_DIR"
+
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "❌ Target directory '$TARGET_DIR' is not a git repository." >&2
   exit 1
 fi
 
-# Read defaults from local .factory/template-sync.json and .factory/config.json
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+cd "$ROOT_DIR"
+
+echo "🎯 Target repository: $ROOT_DIR"
+
+HAS_LOCAL_MANIFEST=0
+if [ -f "$MANIFEST_FILE" ]; then
+  HAS_LOCAL_MANIFEST=1
+fi
+
+# Read defaults from target's .factory/template-sync.json (if present) and .factory/config.json
 eval "$(node -e '
   const fs = require("fs");
-  const manifest = JSON.parse(fs.readFileSync(".factory/template-sync.json", "utf8"));
+  let manifest = {};
+  if (fs.existsSync(".factory/template-sync.json")) {
+    try {
+      manifest = JSON.parse(fs.readFileSync(".factory/template-sync.json", "utf8"));
+    } catch (_) {}
+  }
   let baseBranch = "main";
   if (fs.existsSync(".factory/config.json")) {
     try {
@@ -129,7 +176,7 @@ TARGET_REF="${TARGET_REF:-$DEFAULT_REF}"
 BASE_BRANCH="${BASE_BRANCH:-$DEFAULT_BASE_BRANCH}"
 
 if [ -n "$(git status --porcelain)" ]; then
-  echo "❌ Working tree has uncommitted changes. Please commit or stash them before running sync-template.sh." >&2
+  echo "❌ Target working tree has uncommitted changes. Please commit or stash them before running sync-template.sh." >&2
   git status --short >&2
   exit 1
 fi
@@ -145,14 +192,9 @@ if git remote get-url origin >/dev/null 2>&1; then
 fi
 
 if [ "$CURRENT_REPO" = "$TEMPLATE_REPO" ] && [ "$ALLOW_SELF" -eq 0 ] && [ "$DRY_RUN" -eq 0 ]; then
-  echo "❌ Current repository IS the template repository ($TEMPLATE_REPO)." >&2
-  echo "   Run this script inside a derived working repository (or pass --dry-run / --allow-template-self)." >&2
+  echo "❌ Target repository IS the template repository ($TEMPLATE_REPO)." >&2
+  echo "   Point --target at a derived working repository (or pass --dry-run / --allow-template-self)." >&2
   exit 1
-fi
-
-PREV_VERSION="none"
-if [ -f "$VERSION_FILE" ]; then
-  PREV_VERSION="$(tr -d '[:space:]' < "$VERSION_FILE")"
 fi
 
 # ------------------------------------------------------------------------------
@@ -167,10 +209,6 @@ trap cleanup EXIT
 TEMPLATE_DIR="$TMP_DIR/template"
 
 if [ -n "$SOURCE_DIR" ]; then
-  if [ ! -d "$SOURCE_DIR" ]; then
-    echo "❌ --source-dir '$SOURCE_DIR' does not exist." >&2
-    exit 1
-  fi
   echo "📂 Using local template source: $SOURCE_DIR"
   mkdir -p "$TEMPLATE_DIR"
   tar -C "$SOURCE_DIR" -cf - . | tar -C "$TEMPLATE_DIR" -xf -
@@ -186,43 +224,55 @@ fi
 TEMPLATE_SHA="$(git -C "$TEMPLATE_DIR" rev-parse HEAD)"
 SHORT_SHA="$(git -C "$TEMPLATE_DIR" rev-parse --short=7 HEAD)"
 
+if [ "$HAS_LOCAL_MANIFEST" -eq 0 ]; then
+  echo "  ℹ️  Target has no '$MANIFEST_FILE'; fetching manifest from template ($TEMPLATE_REPO @ $TARGET_REF)..."
+fi
+
+ACTIVE_MANIFEST="$TEMPLATE_DIR/$MANIFEST_FILE"
+if [ ! -f "$ACTIVE_MANIFEST" ]; then
+  if [ "$HAS_LOCAL_MANIFEST" -eq 1 ]; then
+    ACTIVE_MANIFEST="$ROOT_DIR/$MANIFEST_FILE"
+  else
+    echo "❌ Manifest file '$MANIFEST_FILE' not found in target or template ($TEMPLATE_REPO @ $TARGET_REF)." >&2
+    exit 1
+  fi
+fi
+
+VERSION_FILE="$(ACTIVE_MANIFEST="$ACTIVE_MANIFEST" DEFAULT_VERSION_FILE="$VERSION_FILE" node -e '
+  const fs = require("fs");
+  const m = JSON.parse(fs.readFileSync(process.env.ACTIVE_MANIFEST, "utf8"));
+  process.stdout.write(m.versionFile || process.env.DEFAULT_VERSION_FILE || ".factory/template-version");
+')"
+
+PREV_VERSION="none"
+if [ -f "$VERSION_FILE" ]; then
+  PREV_VERSION="$(tr -d '[:space:]' < "$VERSION_FILE")"
+fi
+
 echo "  ✓ Template resolved: $TEMPLATE_REPO @ $TARGET_REF ($SHORT_SHA / $TEMPLATE_SHA)"
 echo "  ℹ️  Previous synced version: $PREV_VERSION"
 
 # ------------------------------------------------------------------------------
 # 3. Copy managed paths from template (preserving app code & local config)
 # ------------------------------------------------------------------------------
-ACTIVE_MANIFEST="$MANIFEST_FILE"
-if [ -f "$TEMPLATE_DIR/$MANIFEST_FILE" ]; then
-  ACTIVE_MANIFEST="$TEMPLATE_DIR/$MANIFEST_FILE"
-fi
-
 echo ""
 echo "📋 Syncing managed paths from manifest ($MANIFEST_FILE)..."
 
-TEMPLATE_DIR="$TEMPLATE_DIR" WORK_DIR="$ROOT_DIR" ACTIVE_MANIFEST="$ACTIVE_MANIFEST" node -e '
+TEMPLATE_DIR="$TEMPLATE_DIR" WORK_DIR="$ROOT_DIR" ACTIVE_MANIFEST="$ACTIVE_MANIFEST" MANIFEST_REL="$MANIFEST_FILE" node -e '
   const fs = require("fs");
   const path = require("path");
 
   const templateDir = process.env.TEMPLATE_DIR;
   const workDir = process.env.WORK_DIR;
   const manifestPath = process.env.ACTIVE_MANIFEST;
+  const manifestRel = process.env.MANIFEST_REL || ".factory/template-sync.json";
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 
-  const managedPaths = manifest.managedPaths || [];
-  const preserveLocalPaths = new Set(manifest.preserveLocalPaths || []);
-
-  // Save preserved local paths in memory if they exist so we never clobber them
-  const preservedBackups = new Map();
-  for (const rel of preserveLocalPaths) {
-    const full = path.join(workDir, rel);
-    if (fs.existsSync(full)) {
-      preservedBackups.set(rel, {
-        isDir: fs.statSync(full).isDirectory(),
-        tempBackup: null
-      });
-    }
+  const managedPaths = Array.isArray(manifest.managedPaths) ? [...manifest.managedPaths] : [];
+  if (!managedPaths.includes(manifestRel)) {
+    managedPaths.unshift(manifestRel);
   }
+  const preserveLocalPaths = new Set(manifest.preserveLocalPaths || []);
 
   function copyRecursive(src, dest, relFromRoot) {
     if (preserveLocalPaths.has(relFromRoot) && fs.existsSync(dest)) {
@@ -325,13 +375,13 @@ Automated template sync from \`$TEMPLATE_REPO\` (\`$TARGET_REF\` @ \`$TEMPLATE_S
 
 - **Previous template version**: \`$PREV_VERSION\`
 - **New template version**: \`$TEMPLATE_SHA\` (\`$SHORT_SHA\`)
-- **Manifest**: [\`.factory/template-sync.json\`](.factory/template-sync.json)
-- **Version file**: [\`.factory/template-version\`](.factory/template-version)
+- **Manifest**: [\`$MANIFEST_FILE\`]($MANIFEST_FILE)
+- **Version file**: [\`$VERSION_FILE\`]($VERSION_FILE)
 
 ## Managed Paths Synced
-$(node -e '
+$(ACTIVE_MANIFEST="$ACTIVE_MANIFEST" node -e '
   const fs = require("fs");
-  const m = JSON.parse(fs.readFileSync(".factory/template-sync.json", "utf8"));
+  const m = JSON.parse(fs.readFileSync(process.env.ACTIVE_MANIFEST, "utf8"));
   for (const p of m.managedPaths || []) console.log("- `" + p + "`");
 ')
 EOF
