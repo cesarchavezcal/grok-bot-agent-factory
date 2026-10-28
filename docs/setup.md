@@ -131,11 +131,14 @@ Before running autonomous merges on a new application:
 Derived working repositories can pull factory infrastructure updates from the private template (`cesarchavezcal/grok-bot-agent-factory`) at any time without touching application code:
 
 ```bash
-# Sync from `main` (default) and open a PR if managed files changed
+# Sync from `main` (default) inside a derived working repo and open a PR if managed files changed
 ./scripts/sync-template.sh
 
 # Sync from a specific branch, tag, or commit SHA
 ./scripts/sync-template.sh --ref <branch-or-sha>
+
+# Run from a template checkout against another target repository (including first-time sync)
+./scripts/sync-template.sh --target /path/to/working-repo
 
 # Preview the diff summary without creating a branch or PR
 ./scripts/sync-template.sh --dry-run
@@ -143,7 +146,10 @@ Derived working repositories can pull factory infrastructure updates from the pr
 
 ### How It Works
 1. **Authenticated Private Fetch**: Uses `gh repo clone` (`gh` CLI authentication) to fetch `cesarchavezcal/grok-bot-agent-factory` into a temporary directory.
-2. **Explicit Manifest (`.factory/template-sync.json`)**: Copies only the managed paths declared in `.factory/template-sync.json`:
+2. **First-Time Bootstrap & `--target <path>`**:
+   - If the target repository does not yet have `.factory/template-sync.json` (for example, an older derived repo or an existing project adopting the factory), `sync-template.sh` fetches `.factory/template-sync.json` from the template ref via `gh` auth, uses it to drive the sync, and includes `.factory/template-sync.json` in the synced files.
+   - Pass `--target <path>` to run `scripts/sync-template.sh` directly from a template checkout against any target repository; both the clean working-tree guard and the template self-guard evaluate the **target** repository rather than the script's location.
+3. **Explicit Manifest (`.factory/template-sync.json`)**: Copies only the managed paths declared in `.factory/template-sync.json`:
    - `.factory/template-sync.json`
    - `.github/workflows/*`
    - `scripts/*` (including `scripts/sync-template.sh`, `scripts/init.sh`, and `scripts/setup-labels.sh`)
@@ -154,6 +160,6 @@ Derived working repositories can pull factory infrastructure updates from the pr
    - `skills-lock.json`
    - `.factory/work-item.schema.json`
    - `.factory/WORK-ITEM.example.json`
-3. **Never Touches App Code**: Application source files, `.factory/config.json` (which stores the working repo's `app` slug and `verifySkill`), `.factory/work-items`, and `.agents/skills/verify-app/features` are preserved.
-4. **Idempotent**: If no managed files changed, it prints an up-to-date message and exits `0` without creating a branch or opening a PR.
-5. **Version Tracking (`.factory/template-version`)**: When managed files change, it records the synced 40-character template commit SHA in `.factory/template-version`, prints a diff summary, pushes `chore/template-sync-<short-sha>`, and opens (or updates) a Pull Request against `main`.
+4. **Never Touches App Code**: Application source files, `.factory/config.json` (which stores the working repo's `app` slug and `verifySkill`), `.factory/work-items`, and `.agents/skills/verify-app/features` are preserved.
+5. **Idempotent**: If no managed files changed, it prints an up-to-date message and exits `0` without creating a branch or opening a PR.
+6. **Version Tracking (`.factory/template-version`)**: When managed files change, it records the synced 40-character template commit SHA in `.factory/template-version`, prints a diff summary, pushes `chore/template-sync-<short-sha>`, and opens (or updates) a Pull Request against `main`.

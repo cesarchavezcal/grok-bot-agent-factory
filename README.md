@@ -33,14 +33,17 @@ See [`docs/setup.md`](docs/setup.md) for manual GitHub/Linear setup details and 
 
 ### Syncing Upstream Template Updates (`sync-template.sh`)
 
-Inside any working repository derived from this template, pull the latest managed workflows, scripts, skills, and rules from the private `cesarchavezcal/grok-bot-agent-factory` template and open a PR:
+Inside any working repository derived from this template (or from a template checkout targeting another repo via `--target`), pull the latest managed workflows, scripts, skills, and rules from the private `cesarchavezcal/grok-bot-agent-factory` template and open a PR:
 
 ```bash
-./scripts/sync-template.sh                  # Sync from `main` (default)
-./scripts/sync-template.sh --ref <ref>      # Sync from a specific branch, tag, or SHA
-./scripts/sync-template.sh --dry-run        # Print diff summary without creating a branch/PR
+./scripts/sync-template.sh                          # Sync from `main` (default)
+./scripts/sync-template.sh --ref <ref>              # Sync from a specific branch, tag, or SHA
+./scripts/sync-template.sh --target /path/to/repo   # Sync another repo from a template checkout
+./scripts/sync-template.sh --dry-run                # Print diff summary without creating a branch/PR
 ```
 
+- **First-Time Sync Ready**: If the target repo does not yet have `.factory/template-sync.json`, the script fetches the manifest from the template ref via `gh` auth, uses it to drive the sync, and includes `.factory/template-sync.json` in the synced files.
+- **Remote Target (`--target <path>`)**: Can be run from a template checkout against another local repo; both the dirty-tree guard and the template self-guard apply to the target repo rather than the script location.
 - **Explicit Manifest ([`.factory/template-sync.json`](.factory/template-sync.json))**: Syncs only managed factory paths (`.factory/template-sync.json`, `.github/workflows/*`, `scripts/*`, `.agents/skills/*`, `.cursor/rules`, `.cursor/agents`, `AGENTS.md`, `skills-lock.json`, `.factory/work-item.schema.json`, `.factory/WORK-ITEM.example.json`) and never touches application code or `.factory/config.json`.
 - **Idempotent**: Prints a diff summary and creates no branch or PR when nothing changed.
 - **Version Tracking ([`.factory/template-version`](.factory/template-version))**: Records the synced 40-character template commit SHA.
