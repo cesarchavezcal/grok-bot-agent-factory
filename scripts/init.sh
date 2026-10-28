@@ -24,7 +24,7 @@ echo "============================================================"
 # 1. Verify required tools & authentication
 # ------------------------------------------------------------------------------
 echo ""
-echo "🔍 [1/5] Checking required tools..."
+echo "🔍 [1/6] Checking required tools..."
 
 missing_tools=0
 for cmd in git gh node npx; do
@@ -59,7 +59,7 @@ fi
 # 2. Install / restore official skills from skills-lock.json
 # ------------------------------------------------------------------------------
 echo ""
-echo "📦 [2/5] Installing/updating official skills from skills-lock.json..."
+echo "📦 [2/6] Installing/updating official skills from skills-lock.json..."
 
 NPM_CACHE_DIR="${NPM_CONFIG_CACHE:-/tmp/grok-bot-agent-factory-npm-cache}"
 
@@ -91,7 +91,7 @@ fi
 # 3. Sync GitHub labels (including `agent`)
 # ------------------------------------------------------------------------------
 echo ""
-echo "🏷️  [3/5] Configuring GitHub labels..."
+echo "🏷️  [3/6] Configuring GitHub labels..."
 
 REPO_SLUG=""
 if git remote get-url origin >/dev/null 2>&1; then
@@ -113,7 +113,7 @@ fi
 # 4. Configure GitHub merge settings & branch protection on `main`
 # ------------------------------------------------------------------------------
 echo ""
-echo "🛡️  [4/5] Configuring repository merge policy & branch protection on 'main'..."
+echo "🛡️  [4/6] Configuring repository merge policy & branch protection on 'main'..."
 
 if [ -n "$REPO_SLUG" ]; then
   REPO_VISIBILITY="$(gh repo view "$REPO_SLUG" --json visibility --jq '.visibility' 2>/dev/null || echo "UNKNOWN")"
@@ -186,10 +186,60 @@ else
 fi
 
 # ------------------------------------------------------------------------------
-# 5. T3 Code registration & .factory/config.json summary
+# 5. Check & configure Grok Bot webhook secrets (GROK_WEBHOOK_URL, GROK_WEBHOOK_AUTH)
 # ------------------------------------------------------------------------------
 echo ""
-echo "🧭 [5/5] Project registration & factory config check..."
+echo "🔐 [5/6] Checking Grok Bot webhook secrets (GROK_WEBHOOK_URL, GROK_WEBHOOK_AUTH)..."
+
+if [ -n "$REPO_SLUG" ]; then
+  EXISTING_SECRETS="$(gh secret list -R "$REPO_SLUG" --json name --jq '.[].name' 2>/dev/null || gh secret list -R "$REPO_SLUG" 2>/dev/null | awk '{print $1}' || true)"
+  MISSING_SECRETS=()
+
+  for SECRET_NAME in GROK_WEBHOOK_URL GROK_WEBHOOK_AUTH; do
+    if echo "$EXISTING_SECRETS" | grep -qx "$SECRET_NAME"; then
+      echo "  ✓ Secret $SECRET_NAME is already set on $REPO_SLUG"
+    else
+      if [ -t 0 ] && [ -t 1 ]; then
+        printf "  🔑 Secret %s is missing. Set it now? [y/N]: " "$SECRET_NAME"
+        read -r REPLY || REPLY=""
+        if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+          echo "     (Enter secret value for $SECRET_NAME below; input is hidden)"
+          if gh secret set "$SECRET_NAME" -R "$REPO_SLUG"; then
+            echo "  ✓ Secret $SECRET_NAME configured on $REPO_SLUG"
+          else
+            echo "  ⚠️ Could not set $SECRET_NAME right now."
+            MISSING_SECRETS+=("$SECRET_NAME")
+          fi
+        else
+          echo "  ⏭️  Skipped $SECRET_NAME"
+          MISSING_SECRETS+=("$SECRET_NAME")
+        fi
+      else
+        echo "  ℹ️  No interactive TTY available to prompt for missing secret $SECRET_NAME."
+        MISSING_SECRETS+=("$SECRET_NAME")
+      fi
+    fi
+  done
+
+  if [ "${#MISSING_SECRETS[@]}" -gt 0 ]; then
+    echo ""
+    echo "  📌 REMINDER: Configure missing Grok Bot webhook secret(s) so .github/workflows/notify-grok.yml can dispatch 'agent' issues:"
+    for MISSING_NAME in "${MISSING_SECRETS[@]}"; do
+      echo "     gh secret set $MISSING_NAME -R $REPO_SLUG"
+    done
+  fi
+else
+  echo "  ⚠️ Skipping GitHub secret checks until remote 'origin' is configured."
+  echo "     Once a remote is set, configure Grok Bot webhook secrets with:"
+  echo "       gh secret set GROK_WEBHOOK_URL"
+  echo "       gh secret set GROK_WEBHOOK_AUTH"
+fi
+
+# ------------------------------------------------------------------------------
+# 6. T3 Code registration & .factory/config.json summary
+# ------------------------------------------------------------------------------
+echo ""
+echo "🧭 [6/6] Project registration & factory config check..."
 
 APP_NAME="$(basename "$ROOT_DIR")"
 if [ -f ".factory/config.json" ]; then

@@ -26,7 +26,8 @@ cd <name>
 2. Installs/restores all official skills pinned by commit SHA and hash in [`skills-lock.json`](skills-lock.json) into `.agents/skills/`.
 3. Creates/updates GitHub repository labels (including `agent`) via [`./scripts/setup-labels.sh`](scripts/setup-labels.sh).
 4. Configures GitHub merge policy via `gh api PATCH` (`allow_auto_merge=true`, `allow_squash_merge=true`, `delete_branch_on_merge=true`) and **Branch protection on `main`** via `gh api PUT` with the required status check **`ci`**. If a repository is private on GitHub Free (`403 / upgrade`), it emits a clear, explicit warning instead of failing silently.
-5. Updates the project slug in [`.factory/config.json`](.factory/config.json) and prints the optional T3 Code project registration command.
+5. Checks `gh secret list` for `GROK_WEBHOOK_URL` and `GROK_WEBHOOK_AUTH`, interactively running `gh secret set` (hidden input) for any missing secret when a TTY is present, or printing a clear reminder without failing if skipped or run non-interactively.
+6. Updates the project slug in [`.factory/config.json`](.factory/config.json) and prints the optional T3 Code project registration command.
 
 See [`docs/setup.md`](docs/setup.md) for manual GitHub/Linear setup details and [`AGENTS.md`](AGENTS.md) for the complete agent operating contract.
 
@@ -36,6 +37,7 @@ See [`docs/setup.md`](docs/setup.md) for manual GitHub/Linear setup details and 
 
 1. **Intake (`agent` label only)**:
    - Only GitHub Issues or Linear Issues labeled with **`agent`** are ingested. Everything else is ignored.
+   - [`.github/workflows/notify-grok.yml`](.github/workflows/notify-grok.yml) triggers on `issues` (`opened`, `labeled`) when the `agent` label is present and `POST`s the GitHub event payload to `GROK_WEBHOOK_URL` (with `Authorization: $GROK_WEBHOOK_AUTH`), exiting `0` with a `::notice::` if either secret is unset.
 2. **Planning (`mattpocock/skills`)**:
    - Uses the full official skills installed from `mattpocock/skills` and locked in [`skills-lock.json`](skills-lock.json):
      - [`wayfinder`](.agents/skills/wayfinder/SKILL.md)
@@ -96,8 +98,10 @@ See [`docs/setup.md`](docs/setup.md) for manual GitHub/Linear setup details and 
 ├── .github/
 │   ├── ISSUE_TEMPLATE/                          # Human feature.md, bug.md, and config.yml
 │   ├── PULL_REQUEST_TEMPLATE.md                 # Generic PR receipt template
-│   └── workflows/ci.yml                         # Generic CI workflow (stable check name: `ci`)
-├── docs/setup.md                                # Branch protection, auto-merge, and labels guide
+│   └── workflows/
+│       ├── ci.yml                               # Generic CI workflow (stable check name: `ci`)
+│       └── notify-grok.yml                      # Dispatches `agent`-labeled issues to Grok Bot webhook
+├── docs/setup.md                                # Branch protection, auto-merge, secrets, and labels guide
 └── scripts/
     ├── init.sh                                  # Idempotent `template init` bootstrap script
     └── setup-labels.sh                          # Idempotent GitHub labels script (+ Linear note)

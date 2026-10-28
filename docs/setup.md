@@ -45,7 +45,29 @@ In Linear (**Workspace Settings → Labels**), create a label named **`agent`** 
 
 ---
 
-## 2. Allow Auto-Merge, Squash Merge & Delete Branch on Merge
+## 2. Grok Bot Webhook Secrets (`GROK_WEBHOOK_URL` & `GROK_WEBHOOK_AUTH`)
+
+`.github/workflows/notify-grok.yml` triggers on `issues` (`types: [opened, labeled]`) and runs only when the issue has the **`agent`** label (`contains(github.event.issue.labels.*.name, 'agent')`). It forwards the GitHub event payload (`$GITHUB_EVENT_PATH`) via `POST` to your Grok Bot endpoint.
+
+### Required Repository Secrets
+- `GROK_WEBHOOK_URL` — Full HTTPS webhook endpoint URL for Grok Bot.
+- `GROK_WEBHOOK_AUTH` — Value sent in the `Authorization` HTTP header (for example, `Bearer <token>`).
+
+During `./scripts/init.sh`, the script checks `gh secret list` for both secrets:
+- Any secret already present is skipped (idempotent).
+- Any missing secret prompts interactively with hidden input via `gh secret set <NAME>` when a TTY is attached (never echoing or logging secret values).
+- If run non-interactively (no TTY) or if you skip the prompt, `./scripts/init.sh` finishes cleanly and prints a reminder with the manual commands:
+
+```bash
+gh secret set GROK_WEBHOOK_URL
+gh secret set GROK_WEBHOOK_AUTH
+```
+
+If either `GROK_WEBHOOK_URL` or `GROK_WEBHOOK_AUTH` is not configured when an `agent`-labeled issue is opened or labeled, `.github/workflows/notify-grok.yml` logs a `::notice::` annotation and exits `0` without failing workflow runs.
+
+---
+
+## 3. Allow Auto-Merge, Squash Merge & Delete Branch on Merge
 
 The `Autopilot-full` playbook merges PRs via **squash merge** once both the **`ci`** status check and independent verification (`verify-app` + Grok 4.7 interrogation) pass.
 
@@ -62,7 +84,7 @@ gh api --method PATCH "repos/$REPO" \
 
 ---
 
-## 3. Branch Protection on `main` (Required Check: `ci`)
+## 4. Branch Protection on `main` (Required Check: `ci`)
 
 `.github/workflows/ci.yml` defines a job with the stable check name **`ci`**.
 
@@ -96,7 +118,7 @@ gh repo edit "$REPO" --visibility public --accept-visibility-change-consequences
 
 ---
 
-## 4. App Verification Skill (`.agents/skills/verify-app`)
+## 5. App Verification Skill (`.agents/skills/verify-app`)
 
 Before running autonomous merges on a new application:
 1. Customize `.agents/skills/verify-app/SKILL.md` (or copy it to `.agents/skills/verify-<app>/SKILL.md` and update `"verifySkill"` in `.factory/config.json`).
