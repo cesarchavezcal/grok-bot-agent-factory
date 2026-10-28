@@ -47,7 +47,7 @@ In Linear (**Workspace Settings → Labels**), create a label named **`agent`** 
 
 ## 2. Grok Bot Webhook Secrets (`GROK_WEBHOOK_URL` & `GROK_WEBHOOK_AUTH`)
 
-`.github/workflows/notify-grok.yml` triggers on `issues` (`types: [opened, labeled]`) and runs only when the issue has the **`agent`** label (`contains(github.event.issue.labels.*.name, 'agent')`). It forwards the GitHub event payload (`$GITHUB_EVENT_PATH`) via `POST` to your Grok Bot endpoint.
+`.github/workflows/notify-grok.yml` triggers on `issues` (`types: [labeled]`) and runs only when the added label is **`agent`** (`github.event.label.name == 'agent'`). It forwards the GitHub event payload (`$GITHUB_EVENT_PATH`) via `POST` to your Grok Bot endpoint.
 
 ### Required Repository Secrets
 - `GROK_WEBHOOK_URL` — Full HTTPS webhook endpoint URL for Grok Bot.
@@ -63,7 +63,7 @@ gh secret set GROK_WEBHOOK_URL
 gh secret set GROK_WEBHOOK_AUTH
 ```
 
-If either `GROK_WEBHOOK_URL` or `GROK_WEBHOOK_AUTH` is not configured when an `agent`-labeled issue is opened or labeled, `.github/workflows/notify-grok.yml` logs a `::notice::` annotation and exits `0` without failing workflow runs.
+If either `GROK_WEBHOOK_URL` or `GROK_WEBHOOK_AUTH` is not configured when an issue is labeled with `agent`, `.github/workflows/notify-grok.yml` logs a `::notice::` annotation and exits `0` without failing workflow runs.
 
 ---
 
