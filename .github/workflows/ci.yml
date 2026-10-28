@@ -21,6 +21,11 @@ jobs:
         run: |
           test -f .factory/config.json
           test -f .factory/work-item.schema.json
+          test -f .factory/template-sync.json
+          test -f .factory/template-version
+          test -x scripts/sync-template.sh
+          bash -n scripts/sync-template.sh
+          bash -n scripts/init.sh
           test -f skills-lock.json
           test -f AGENTS.md
           node -e '
@@ -32,7 +37,22 @@ jobs:
             if (cfg.intake?.requiredLabel !== "agent") {
               throw new Error("intake.requiredLabel must be agent");
             }
-            console.log("Factory config invariants OK.");
+            const syncManifest = JSON.parse(fs.readFileSync(".factory/template-sync.json", "utf8"));
+            const requiredPaths = [
+              ".factory/template-sync.json",
+              ".github/workflows/*",
+              "scripts/*",
+              ".agents/skills/*",
+              ".cursor/rules",
+              ".cursor/agents",
+              "AGENTS.md"
+            ];
+            for (const req of requiredPaths) {
+              if (!Array.isArray(syncManifest.managedPaths) || !syncManifest.managedPaths.includes(req)) {
+                throw new Error("Missing required managed path in .factory/template-sync.json: " + req);
+              }
+            }
+            console.log("Factory config and template-sync manifest invariants OK.");
           '
 
       - name: Run Node.js lint / test / build (if package.json exists)

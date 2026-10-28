@@ -1,0 +1,22 @@
+{
+  "templateRepo": "cesarchavezcal/grok-bot-agent-factory",
+  "defaultRef": "main",
+  "versionFile": ".factory/template-version",
+  "managedPaths": [
+    ".factory/template-sync.json",
+    ".github/workflows/*",
+    "scripts/*",
+    ".agents/skills/*",
+    ".cursor/rules",
+    ".cursor/agents",
+    "AGENTS.md",
+    "skills-lock.json",
+    ".factory/work-item.schema.json",
+    ".factory/WORK-ITEM.example.json"
+  ],
+  "preserveLocalPaths": [
+    ".factory/config.json",
+    ".factory/work-items",
+    ".agents/skills/verify-app/features"
+  ]
+}

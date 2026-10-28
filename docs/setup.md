@@ -123,3 +123,37 @@ gh repo edit "$REPO" --visibility public --accept-visibility-change-consequences
 Before running autonomous merges on a new application:
 1. Customize `.agents/skills/verify-app/SKILL.md` (or copy it to `.agents/skills/verify-<app>/SKILL.md` and update `"verifySkill"` in `.factory/config.json`).
 2. Document your user-facing feature verification recipes in `.agents/skills/verify-app/features/`.
+
+---
+
+## 6. Syncing Upstream Template Updates (`./scripts/sync-template.sh`)
+
+Derived working repositories can pull factory infrastructure updates from the private template (`cesarchavezcal/grok-bot-agent-factory`) at any time without touching application code:
+
+```bash
+# Sync from `main` (default) and open a PR if managed files changed
+./scripts/sync-template.sh
+
+# Sync from a specific branch, tag, or commit SHA
+./scripts/sync-template.sh --ref <branch-or-sha>
+
+# Preview the diff summary without creating a branch or PR
+./scripts/sync-template.sh --dry-run
+```
+
+### How It Works
+1. **Authenticated Private Fetch**: Uses `gh repo clone` (`gh` CLI authentication) to fetch `cesarchavezcal/grok-bot-agent-factory` into a temporary directory.
+2. **Explicit Manifest (`.factory/template-sync.json`)**: Copies only the managed paths declared in `.factory/template-sync.json`:
+   - `.factory/template-sync.json`
+   - `.github/workflows/*`
+   - `scripts/*` (including `scripts/sync-template.sh`, `scripts/init.sh`, and `scripts/setup-labels.sh`)
+   - `.agents/skills/*`
+   - `.cursor/rules`
+   - `.cursor/agents`
+   - `AGENTS.md`
+   - `skills-lock.json`
+   - `.factory/work-item.schema.json`
+   - `.factory/WORK-ITEM.example.json`
+3. **Never Touches App Code**: Application source files, `.factory/config.json` (which stores the working repo's `app` slug and `verifySkill`), `.factory/work-items`, and `.agents/skills/verify-app/features` are preserved.
+4. **Idempotent**: If no managed files changed, it prints an up-to-date message and exits `0` without creating a branch or opening a PR.
+5. **Version Tracking (`.factory/template-version`)**: When managed files change, it records the synced 40-character template commit SHA in `.factory/template-version`, prints a diff summary, pushes `chore/template-sync-<short-sha>`, and opens (or updates) a Pull Request against `main`.
