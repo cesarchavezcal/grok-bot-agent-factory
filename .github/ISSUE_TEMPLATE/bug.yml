@@ -1,0 +1,46 @@
+name: Bug Report
+description: Report a bug or regression for autonomous reproduction and resolution
+title: "fix: <short summary>"
+labels: ["bug", "agent"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### Grok Bot Agent Factory — Bug Ingestion
+        Submitting this form attaches the `bug` and `agent` labels, dispatching the autonomous **`fix-bug`** pipeline.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the defect, observed error, or unexpected behavior.
+      placeholder: Tell us what went wrong...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen instead?
+      placeholder: Tell us what was expected...
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Minimal, step-by-step reproduction instructions.
+      placeholder: |
+        1. Run command '...'
+        2. Navigate to '...'
+        3. Observe crash/error...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error messages or logs
+      description: Paste any terminal stack traces, console outputs, or error logs.
+      placeholder: Paste logs here...
+      render: shell
+    validations:
+      required: false

@@ -88,7 +88,7 @@ else
 fi
 
 # ------------------------------------------------------------------------------
-# 3. Sync GitHub labels (including `agent` and `epic`)
+# 3. Sync GitHub labels (including `agent`, `epic`, `deploy`, `bug`)
 # ------------------------------------------------------------------------------
 echo ""
 echo "🏷️  [3/6] Configuring GitHub labels..."
@@ -119,15 +119,15 @@ if [ -n "$REPO_SLUG" ]; then
   REPO_VISIBILITY="$(gh repo view "$REPO_SLUG" --json visibility --jq '.visibility' 2>/dev/null || echo "UNKNOWN")"
   echo "  ℹ️  Repository visibility: $REPO_VISIBILITY"
 
-  # 4a. Enable allow_auto_merge, squash merge, and delete_branch_on_merge via gh api PATCH
+  # 4a. Enable allow_auto_merge, squash merge, and preserve branches (delete_branch_on_merge=false) via gh api PATCH
   PATCH_ERR=""
   if PATCH_ERR="$(gh api --method PATCH "repos/$REPO_SLUG" \
     -F allow_auto_merge=true \
     -F allow_squash_merge=true \
     -F allow_merge_commit=false \
     -F allow_rebase_merge=false \
-    -F delete_branch_on_merge=true 2>&1 >/dev/null)"; then
-    echo "  ✓ Enabled allow_auto_merge, squash-only merge, and delete_branch_on_merge on $REPO_SLUG"
+    -F delete_branch_on_merge=false 2>&1 >/dev/null)"; then
+    echo "  ✓ Enabled allow_auto_merge, squash-only merge, and delete_branch_on_merge=false on $REPO_SLUG"
   else
     if echo "$PATCH_ERR" | grep -qiE "403|422|upgrade|private|auto-merge"; then
       echo "  ⚠️  EXPLICIT WARNING (Auto-Merge / Merge Settings):"
@@ -137,12 +137,12 @@ if [ -n "$REPO_SLUG" ]; then
       echo "       gh repo create <name> --public --template cesarchavezcal/grok-bot-agent-factory --clone"
       echo "     Or make an existing working repo public with:"
       echo "       gh repo edit $REPO_SLUG --visibility public --accept-visibility-change-consequences"
-      # Still apply squash-only and delete_branch_on_merge even if allow_auto_merge requires public/Pro
+      # Still apply squash-only and delete_branch_on_merge=false even if allow_auto_merge requires public/Pro
       gh api --method PATCH "repos/$REPO_SLUG" \
         -F allow_squash_merge=true \
         -F allow_merge_commit=false \
         -F allow_rebase_merge=false \
-        -F delete_branch_on_merge=true >/dev/null 2>&1 || true
+        -F delete_branch_on_merge=false >/dev/null 2>&1 || true
     else
       echo "  ⚠️  Could not update merge settings on '$REPO_SLUG': $PATCH_ERR"
     fi

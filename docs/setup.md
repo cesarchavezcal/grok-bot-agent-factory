@@ -1,32 +1,14 @@
-# Setup & Repository Protection Guide
+# Setup & GitHub/Linear Configuration Guide
 
-> **Important (GitHub Free Policy):** The template repository `cesarchavezcal/grok-bot-agent-factory` stays **PRIVATE**, but **all working repositories created from this template MUST be created as PUBLIC** (`--public`). GitHub Free only supports Branch Protection (`ci` required check) and Auto-Merge on public repositories.
+This guide covers initial setup, GitHub merge policies, branch protection, secrets, labels, and template sync for working repositories created from `cesarchavezcal/grok-bot-agent-factory`.
 
----
-
-## 0. Create a New Working Repository from the Template (`PUBLIC`)
-
-When an agent or **Grok Bot** creates a new working project from this template:
-
-```bash
-gh repo create <name> --public --template cesarchavezcal/grok-bot-agent-factory --clone
-cd <name>
-./scripts/init.sh
-```
-
-Or if initializing from an existing local directory without a remote yet:
-
-```bash
-./scripts/init.sh --create-repo <name>
-```
-
-`./scripts/init.sh` is **100% idempotent** and safe to re-run at any time. If a repository happens to be private on a GitHub Free plan (where the GitHub API returns HTTP `403 / Upgrade to GitHub Pro`), `./scripts/init.sh` emits an explicit warning with the exact command to switch visibility to public without failing silently.
+> **Reminder (GitHub Free):** Working repositories created from this template **must be PUBLIC** (`--public`) so that GitHub Free allows required status checks (`ci`) and `allow_auto_merge`.
 
 ---
 
-## 1. Labels (`agent` & `epic` Intake Gate)
+## 1. Labels (`agent`, `epic`, `deploy`, `bug`)
 
-Only issues carrying the **`agent`** label are processed by the factory. All unlabeled issues (or issues without `agent`) are ignored.
+The factory relies on GitHub and Linear labels to route incoming tickets to the appropriate orchestrator skill.
 
 ### GitHub
 Run the idempotent label script (also executed automatically by `./scripts/init.sh`):
@@ -38,14 +20,19 @@ Run the idempotent label script (also executed automatically by `./scripts/init.
 This creates/updates:
 - `agent` (`#0E8A16`) — Trigger: issue is picked up by the autonomous agent factory (Grok Bot).
 - `epic` (`#B60205`) — Planning only: split into agent sub-issues.
-- `waiting-for-human` (`#FBCA04`) — Set when the agent posts a numbered block of 2–3 grilling questions and stops.
+- `deploy` (`#006B75`) — Deploy trigger: applied to the final sub-issue of an epic at creation; triggers deploy after green merge.
+- `waiting-for-human` (`#FBCA04`) — Blocked on questions awaiting human response via Grok Bot.
 - `in-progress` (`#1D76DB`), `rework` (`#D93F0B`), `ready-to-merge` (`#5319E7`), `feature` (`#A2EEEF`), `bug` (`#D73A4A`).
 
-### Issue Modes (`epic` + `agent` vs. `agent` alone)
-- **`agent` alone**: Treated as a normal issue (executes the standard plan, build, verify, and merge pipeline). Its PR body uses `Closes #N` (never `Refs #N`) so the issue closes automatically when the PR merges.
-- **`epic` + `agent`**: Runs as a planning-only thread that creates sub-issues labeled `agent` (referencing `"Part of #N"`), where the last sub-issue is deploy. Each sub-issue PR uses `Closes #N` (never `Refs #N`), and the last (deploy) sub-issue PR also includes `Closes #EPIC` so merging the final PR closes both the deploy sub-issue and the parent epic.
-- **Issue closing**: Agents never close issues by hand; issues close only when their PR merges.
-- **Labeling order (`epic` before `agent`)**: Because `.github/workflows/notify-grok.yml` triggers when the `agent` label is added, **always add `epic` before `agent`** so `epic` is already present in the webhook payload when `agent` dispatches the issue.
+### Skill Routing Matrix & Priority
+- **`epic` + `agent`** -> **`plan-epic`**: Planning-only thread that decomposes an epic into vertical sub-issues (`Part of #N`). Every created sub-issue MUST get the `agent` label; exactly one final sub-issue receives the `deploy` label. Label existence is verified before completion.
+  - *Precedence*: `epic` takes priority over all other labels. If an issue has `epic` + `bug` + `agent`, it routes to `plan-epic`.
+- **`bug` + `agent`** -> **`fix-bug`**: Reproduction-first defect workflow. Reproduces first (if unable to reproduce, stops and asks César in thread final message) -> writes failing test -> fixes root cause (`ce-debug`, `tdd`, `principle-fix-root-causes`) -> verifies all tests + runs app once -> Grok audit -> PR `Closes #N` -> merge on green CI.
+- **`agent` alone (or with `feature`)** -> **`implement-ticket`**: Full lifecycle: plan (`grill-with-docs` + `wayfinder`) -> build (`poteto-mode`) -> Grok audit -> rework rule -> PR `Closes #N` -> merge on green CI.
+- **Manual Labeling Order (`epic` before `agent`)**: When manually labeling an existing issue in GitHub or Linear, **always add `epic` before `agent`** so `epic` is already present on the issue payload when `agent` triggers `notify-grok.yml`.
+- **Deploy Rule**: Intermediate sub-issues never deploy. Deploy occurs only on the final sub-issue of an epic (carrying the `deploy` label), after its green merge.
+- **Issue Closing Rule**: Every PR body uses `Closes #N` (never `Refs #N`). For epics, the final deploy sub-issue PR also includes `Closes #EPIC`. Agents never close issues by hand.
+- **Communication Rule**: Never comment on issues or PRs. When questions or reproduction blockers arise, stop and write them in the thread final message for dispatcher relay.
 
 ### Linear
 In Linear (**Workspace Settings → Labels**), create a label named **`agent`** (exact lowercase). Only Linear issues tagged with `agent` are dispatched.
@@ -54,7 +41,10 @@ In Linear (**Workspace Settings → Labels**), create a label named **`agent`** 
 
 ## 2. Grok Bot Webhook Secrets (`GROK_WEBHOOK_URL` & `GROK_WEBHOOK_AUTH`)
 
-`.github/workflows/notify-grok.yml` triggers on `issues` (`types: [labeled]`) and runs only when the added label is **`agent`** (`github.event.label.name == 'agent'`). It forwards the GitHub event payload (`$GITHUB_EVENT_PATH`) via `POST` to your Grok Bot endpoint.
+`.github/workflows/notify-grok.yml` triggers on `issues` (`opened`, `labeled`) and verifies the presence of the `agent` label:
+- When an issue is **created with labels** (e.g., via the `.github/ISSUE_TEMPLATE/bug.yml` issue form), it dispatches on `opened`. Concurrency with `cancel-in-progress: true` and stable delivery IDs eliminate redundant in-flight runs.
+- When `agent` is **added later to an existing issue**, it dispatches on `labeled`.
+- The webhook payload includes the full event enriched with an explicit top-level `labels` array and a stable `delivery_id`.
 
 ### Required Repository Secrets
 - `GROK_WEBHOOK_URL` — Full HTTPS webhook endpoint URL for Grok Bot.
@@ -74,9 +64,9 @@ If either `GROK_WEBHOOK_URL` or `GROK_WEBHOOK_AUTH` is not configured when an is
 
 ---
 
-## 3. Allow Auto-Merge, Squash Merge & Delete Branch on Merge
+## 3. Allow Auto-Merge, Squash Merge & Preserve Branches
 
-The `Autopilot-full` playbook merges PRs via **squash merge** once both the **`ci`** status check and independent verification (`verify-app` + Grok 4.7 interrogation) pass. Every PR body uses `Closes #N` (never `Refs #N`) so the issue closes when the PR merges, and for epics the last (deploy) sub-issue PR also includes `Closes #EPIC`; agents never close issues by hand.
+The `Autopilot-full` playbook merges PRs via **squash merge** once both the **`ci`** status check and independent verification (`verify-app` + Grok 4.7 interrogation) pass. Branches are preserved (`delete_branch_on_merge=false`). Every PR body uses `Closes #N` (never `Refs #N`) so the issue closes when the PR merges, and for epics the last (deploy) sub-issue PR also includes `Closes #EPIC`.
 
 ### CLI (`gh api PATCH`)
 ```bash
@@ -86,7 +76,7 @@ gh api --method PATCH "repos/$REPO" \
   -F allow_squash_merge=true \
   -F allow_merge_commit=false \
   -F allow_rebase_merge=false \
-  -F delete_branch_on_merge=true
+  -F delete_branch_on_merge=false
 ```
 
 ---
@@ -159,6 +149,7 @@ Derived working repositories can pull factory infrastructure updates from the pr
 3. **Explicit Manifest (`.factory/template-sync.json`)**: Copies only the managed paths declared in `.factory/template-sync.json`:
    - `.factory/template-sync.json`
    - `.github/workflows/*`
+   - `.github/ISSUE_TEMPLATE/*`
    - `scripts/*` (including `scripts/sync-template.sh`, `scripts/init.sh`, and `scripts/setup-labels.sh`)
    - `.agents/skills/*`
    - `.cursor/rules`

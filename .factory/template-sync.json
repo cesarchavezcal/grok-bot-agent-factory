@@ -5,6 +5,7 @@
   "managedPaths": [
     ".factory/template-sync.json",
     ".github/workflows/*",
+    ".github/ISSUE_TEMPLATE/*",
     "scripts/*",
     ".agents/skills/*",
     ".cursor/rules",
