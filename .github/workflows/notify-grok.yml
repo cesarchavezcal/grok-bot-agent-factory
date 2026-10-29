@@ -3,64 +3,22 @@ run-name: "notify-grok #${{ github.event.issue.number }} (${{ github.event.actio
 
 on:
   issues:
-    types: [opened, labeled]
+    types: [labeled]
 
 permissions:
   contents: read
   issues: read
-  actions: read
 
 jobs:
   notify-grok:
     name: notify-grok
-    # Run when:
-    # 1. Issue is opened with the 'agent' label already applied (e.g. via bug.yml or API)
-    # 2. Issue has the 'agent' label added
-    if: >-
-      (github.event.action == 'opened' && contains(github.event.issue.labels.*.name, 'agent')) ||
-      (github.event.action == 'labeled' && github.event.label.name == 'agent')
+    if: github.event.label.name == 'agent'
     concurrency:
       group: notify-grok-${{ github.event.issue.number }}
       cancel-in-progress: false
     runs-on: ubuntu-latest
     steps:
-      - name: Deduplicate initial creation burst
-        id: dedup
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ACTION: ${{ github.event.action }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
-          RUN_ID: ${{ github.run_id }}
-        run: |
-          if [ "$ACTION" = "labeled" ]; then
-            CREATED_AT="${{ github.event.issue.created_at }}"
-            CREATED_EPOCH=$(date -d "$CREATED_AT" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$CREATED_AT" +%s 2>/dev/null || echo 0)
-            NOW_EPOCH=$(date +%s)
-            AGE=$(( NOW_EPOCH - CREATED_EPOCH ))
-
-            # Only check for duplicate creation event if issue was created in the last 60 seconds
-            if [ "$AGE" -ge 0 ] && [ "$AGE" -le 60 ]; then
-              TARGET_TITLE="notify-grok #$ISSUE_NUMBER (opened)"
-              # Find if an 'opened' run exists for this specific issue that is queued, pending, in-progress, or succeeded
-              OPENED_RUN=$(gh run list \
-                --workflow=notify-grok.yml \
-                --event=issues \
-                --limit 100 \
-                --json databaseId,conclusion,status,displayTitle \
-                -q "[.[] | select(.displayTitle == \"$TARGET_TITLE\" and (.status != \"completed\" or .conclusion == \"success\"))] | first // empty" \
-                2>/dev/null || true)
-
-              if [ -n "$OPENED_RUN" ]; then
-                echo "duplicate=true" >> "$GITHUB_OUTPUT"
-                echo "::notice::Skipping duplicate notification: issue #$ISSUE_NUMBER was already dispatched on 'opened'."
-                exit 0
-              fi
-            fi
-          fi
-          echo "duplicate=false" >> "$GITHUB_OUTPUT"
-
       - name: Send issue event to Grok Bot webhook
-        if: steps.dedup.outputs.duplicate != 'true'
         env:
           URL: ${{ secrets.GROK_WEBHOOK_URL }}
           AUTH: ${{ secrets.GROK_WEBHOOK_AUTH }}
@@ -71,10 +29,12 @@ jobs:
             echo "::notice::Skipping Grok webhook notification: GROK_WEBHOOK_URL or GROK_WEBHOOK_AUTH secret is not set."
             exit 0
           fi
+          IDEMPOTENCY_KEY="${{ github.repository }}#${{ github.event.issue.number }}"
           DELIVERY_ID="${{ github.event.issue.number }}-${RUN_ID}-${RUN_ATTEMPT}"
-          jq --arg delivery_id "$DELIVERY_ID" \
+          jq --arg idempotency_key "$IDEMPOTENCY_KEY" \
+             --arg delivery_id "$DELIVERY_ID" \
              --arg run_id "$RUN_ID" \
-             '.delivery_id = $delivery_id | .run_id = $run_id | .labels = [(.issue.labels // [])[].name]' \
+             '.idempotency_key = $idempotency_key | .delivery_id = $delivery_id | .run_id = $run_id | .labels = [(.issue.labels // [])[].name]' \
              "$GITHUB_EVENT_PATH" | curl -fsS -X POST "$URL" \
             -H "Authorization: $AUTH" \
             -H "Content-Type: application/json" \
