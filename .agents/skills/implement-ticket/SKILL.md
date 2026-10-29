@@ -34,6 +34,10 @@ High-level orchestrator skill designed for autonomous feature tickets and issue-
 - **Trigger**: Issue carries the `agent` label (and does not carry `bug` or `epic`).
   - *Precedence Rule*: `epic` takes highest precedence (routes to `plan-epic`), followed by `bug` (routes to `fix-bug`).
 - **Scout Model**: `antigravity::gemini-3.8-flash-low` (`effort: low`).
+- **GitHub Account Invariant**:
+  - Every commit, push, and PR must use the GitHub account `cesarchavezcal`.
+  - Check `gh auth status` first before any push or `gh` command; if not `cesarchavezcal`, remember the active account, switch with `gh auth switch --user cesarchavezcal`, and switch back when done.
+  - Maintain git email `cesarchavezcal@gmail.com` via `includeIf`, never changing the global git email.
 - Parse issue number `#N`, title, description, and attached labels.
 - Perform targeted read-only reconnaissance across the codebase.
 - Produce a tight context brief (`<2KB`) listing relevant files, existing patterns, tests, and documentation.
@@ -54,7 +58,7 @@ High-level orchestrator skill designed for autonomous feature tickets and issue-
   3. **Open Questions (Stop Gate)**: If ANY open question, scope ambiguity, or product trade-off remains:
      - **NEVER comment on the issue or PR**.
      - Stop execution immediately without editing files.
-     - Write a single numbered block of 2–3 questions in the **thread final message**. The external dispatcher (**Grok Bot**) will relay the block to César and pause until answered.
+     - Write the questions directly in the **thread final message**. The external dispatcher (**Grok Bot**) will relay the questions to César and pause until answered.
   4. **No Questions (Immediate Build)**: If there are NO open questions:
      - Write `"No questions, starting build"`.
      - Continue directly to the build (Phase 3) in the same run without waiting for a separate build message.

@@ -38,6 +38,10 @@ High-level bug fixing skill for autonomous defect triage, reproduction-first dia
   - *Precedence Rule*: If an issue carries `epic` + `bug` + `agent`, **`plan-epic` takes precedence**.
 - **Plan-Then-Build Protocol**:
   - Every issue thread starts with a short plan directly in the thread (reproduction approach, files to inspect/modify, tests to author, verification).
+- **GitHub Account & Identity Invariant**:
+  - Every commit, push, and PR must use the GitHub account `cesarchavezcal`.
+  - Check `gh auth status` first before any push or `gh` command; if not `cesarchavezcal`, remember the active account, switch using `gh auth switch --user cesarchavezcal`, and switch back when done.
+  - Maintain git email `cesarchavezcal@gmail.com` via `includeIf`, and never change the global git email.
 - Extract structured inputs from the bug issue form:
   - **What happened** (unexpected behavior or crash symptom)
   - **Expected behavior** (desired correct state)
@@ -55,7 +59,7 @@ High-level bug fixing skill for autonomous defect triage, reproduction-first dia
   - If the bug CANNOT be reproduced after attempting the provided steps and inspecting logs, or if ANY open question remains:
     - **DO NOT guess, assume, or apply speculative fixes.**
     - **NEVER comment on the GitHub/Linear issue or PR.**
-    - Stop execution immediately without editing source files.
+    - Stop execution immediately without editing files.
     - Write the detailed reproduction obstacle and questions for César in the **thread final message**. The external dispatcher (**Grok Bot**) will relay it to César.
 - **No Questions Gate (Immediate Build)**:
   - If the bug is reproduced and there are NO open questions:
