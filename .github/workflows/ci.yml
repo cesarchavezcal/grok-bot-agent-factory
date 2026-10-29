@@ -26,17 +26,76 @@ jobs:
           test -x scripts/sync-template.sh
           bash -n scripts/sync-template.sh
           bash -n scripts/init.sh
+          test -x scripts/setup-labels.sh
+          bash -n scripts/setup-labels.sh
           test -f skills-lock.json
           test -f AGENTS.md
           node -e '
             const fs = require("fs");
-            const cfg = JSON.parse(fs.readFileSync(".factory/config.json", "utf8"));
+            const rawConfig = fs.readFileSync(".factory/config.json", "utf8");
+            const cfg = JSON.parse(rawConfig);
+
+            // Invariant: Zero paid API keys & Claude-free
             if (!cfg.invariants?.strictZeroCost || !cfg.invariants?.disallowClaude) {
               throw new Error("Factory invariants violated in .factory/config.json");
             }
             if (cfg.intake?.requiredLabel !== "agent") {
               throw new Error("intake.requiredLabel must be agent");
             }
+
+            // Invariant: Argon is completely retired and forbidden
+            if (/argon/i.test(rawConfig)) {
+              throw new Error("Argon model detected in .factory/config.json — Argon is retired and forbidden");
+            }
+
+            // Invariant: Gemini Flash effort rule & model orchestration
+            if (cfg.models?.planner?.model !== "gemini-3.8-flash-high") {
+              throw new Error("models.planner.model must be gemini-3.8-flash-high");
+            }
+            if (cfg.models?.rework?.model !== "gemini-3.8-flash-high") {
+              throw new Error("models.rework.model must be gemini-3.8-flash-high");
+            }
+            if (cfg.models?.scout?.model !== "gemini-3.8-flash-low") {
+              throw new Error("models.scout.model must be gemini-3.8-flash-low");
+            }
+            if (cfg.models?.builderStandard?.model !== "gemini-3.8-flash-medium") {
+              throw new Error("models.builderStandard.model must be gemini-3.8-flash-medium");
+            }
+            if (cfg.models?.verifier?.model !== "gemini-3.8-flash-medium") {
+              throw new Error("models.verifier.model must be gemini-3.8-flash-medium");
+            }
+            if (cfg.models?.interrogator?.model !== "grok-4.7") {
+              throw new Error("models.interrogator.model must be grok-4.7");
+            }
+
+            // Invariant: Rework must escalate to a different provider family than the auditor
+            if (cfg.models?.rework?.providerInstanceId === cfg.models?.interrogator?.providerInstanceId) {
+              throw new Error("Rework model provider must differ from interrogator auditor provider");
+            }
+
+            // Invariant: No argon references in work-item schema or agents or rules
+            const rawSchema = fs.readFileSync(".factory/work-item.schema.json", "utf8");
+            if (/argon/i.test(rawSchema)) {
+              throw new Error("Argon reference detected in .factory/work-item.schema.json");
+            }
+
+            for (const agentFile of ["builder-flash.md", "builder-grok.md", "interrogator-grok.md"]) {
+              const content = fs.readFileSync(".cursor/agents/" + agentFile, "utf8");
+              if (/argon/i.test(content)) {
+                throw new Error("Argon reference detected in .cursor/agents/" + agentFile);
+              }
+            }
+
+            const rawAgents = fs.readFileSync("AGENTS.md", "utf8");
+            if (/gemini-4-argon/i.test(rawAgents)) {
+              throw new Error("gemini-4-argon reference detected in AGENTS.md");
+            }
+
+            const rawRules = fs.readFileSync(".cursor/rules/factory.mdc", "utf8");
+            if (/gemini-4-argon/i.test(rawRules)) {
+              throw new Error("gemini-4-argon reference detected in .cursor/rules/factory.mdc");
+            }
+
             const syncManifest = JSON.parse(fs.readFileSync(".factory/template-sync.json", "utf8"));
             const requiredPaths = [
               ".factory/template-sync.json",
@@ -52,7 +111,7 @@ jobs:
                 throw new Error("Missing required managed path in .factory/template-sync.json: " + req);
               }
             }
-            console.log("Factory config and template-sync manifest invariants OK.");
+            console.log("Factory config, model orchestration, and template-sync manifest invariants OK.");
           '
 
       - name: Run Node.js lint / test / build (if package.json exists)

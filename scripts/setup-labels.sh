@@ -33,7 +33,7 @@ create_label "agent"             "0E8A16" "Trigger: issue is picked up by the au
 create_label "epic"              "B60205" "Planning only: split into agent sub-issues"
 create_label "waiting-for-human" "FBCA04" "Blocked on 2-3 numbered grilling questions awaiting human response via Grok Bot"
 create_label "in-progress"       "1D76DB" "Currently being planned, built, or verified by an agent worktree"
-create_label "rework"            "D93F0B" "Escalated to Gemini 4 Argon High for rework after verification/interrogation failure"
+create_label "rework"            "D93F0B" "Escalated to Gemini 3.8 Flash High for rework after verification/interrogation failure"
 create_label "ready-to-merge"    "5319E7" "Green CI + independent verification & Grok 4.7 interrogation passed"
 create_label "feature"           "A2EEEF" "New user-facing feature or enhancement"
 create_label "bug"               "D73A4A" "Bug report or regression fix"

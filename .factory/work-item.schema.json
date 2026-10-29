@@ -103,7 +103,7 @@
       "type": "integer",
       "minimum": 0,
       "maximum": 2,
-      "description": "Number of rework attempts (escalated to antigravity::gemini-4-argon-high, max 2)"
+      "description": "Number of rework attempts (escalated to antigravity::gemini-3.8-flash-high, max 2)"
     },
     "prUrl": {
       "type": "string"

@@ -42,21 +42,21 @@
     "scout": {
       "pool": "AGY_FAST",
       "providerInstanceId": "antigravity",
-      "model": "gemini-3.8-flash-high",
+      "model": "gemini-3.8-flash-low",
       "fallback": "gemini-3.8-flash-medium",
       "role": "context-scout"
     },
     "planner": {
-      "pool": "AGY_PRO",
+      "pool": "AGY_FAST",
       "providerInstanceId": "antigravity",
-      "model": "gemini-4-argon-high",
-      "fallback": "gemini-3.8-flash-high",
+      "model": "gemini-3.8-flash-high",
+      "fallback": "gemini-3.8-flash-medium",
       "role": "spec-and-plan"
     },
     "builderStandard": {
       "pool": "AGY_FAST",
       "providerInstanceId": "antigravity",
-      "model": "gemini-3.8-flash-high",
+      "model": "gemini-3.8-flash-medium",
       "fallback": "grok-4.7-build-fast",
       "scope": ["ui", "crud", "frontend", "docs", "chore"],
       "role": "implementation"
@@ -70,16 +70,16 @@
       "role": "implementation"
     },
     "rework": {
-      "pool": "AGY_PRO",
+      "pool": "AGY_FAST",
       "providerInstanceId": "antigravity",
-      "model": "gemini-4-argon-high",
+      "model": "gemini-3.8-flash-high",
       "maxRetries": 2,
       "role": "rework-escalation"
     },
     "verifier": {
       "pool": "AGY_FAST",
       "providerInstanceId": "antigravity",
-      "model": "gemini-3.8-flash-high",
+      "model": "gemini-3.8-flash-medium",
       "fallback": "gemini-3.8-flash-low",
       "role": "runtime-verify"
     },

@@ -51,19 +51,24 @@ What [`./scripts/init.sh`](scripts/init.sh) does (idempotent, safe to re-run at 
 
 | Stage | Primary Skill(s) | Active Model (`provider::model`) | Pool |
 | :--- | :--- | :--- | :--- |
-| **Phase 0: Context Scout** | Repo exploration & context brief (`<2KB`) | `antigravity::gemini-3.8-flash-high` | `AGY_FAST` |
-| **Phase 1: Discovery & Grilling** | [`wayfinder`](.agents/skills/wayfinder/SKILL.md), [`grill-with-docs`](.agents/skills/grill-with-docs/SKILL.md), [`grilling`](.agents/skills/grilling/SKILL.md), [`domain-modeling`](.agents/skills/domain-modeling/SKILL.md) | `antigravity::gemini-4-argon-high` | `AGY_PRO` |
-| **Phase 2: Spec & Tickets** | [`to-spec`](.agents/skills/to-spec/SKILL.md), [`to-tickets`](.agents/skills/to-tickets/SKILL.md) | `antigravity::gemini-4-argon-high` | `AGY_PRO` |
-| **Phase 3a: Build (UI / CRUD)** | [`poteto-mode`](.agents/skills/poteto-mode/SKILL.md) ([`autopilot-full`](.agents/skills/poteto-mode/playbooks/autopilot-full.md)) + [`tdd`](.agents/skills/tdd/SKILL.md) | `antigravity::gemini-3.8-flash-high` | `AGY_FAST` |
+| **Phase 0: Context Scout** | Repo exploration & context brief (`<2KB`) | `antigravity::gemini-3.8-flash-low` | `AGY_FAST` |
+| **Phase 1: Discovery & Grilling** | [`wayfinder`](.agents/skills/wayfinder/SKILL.md), [`grill-with-docs`](.agents/skills/grill-with-docs/SKILL.md), [`grilling`](.agents/skills/grilling/SKILL.md), [`domain-modeling`](.agents/skills/domain-modeling/SKILL.md) | `antigravity::gemini-3.8-flash-high` | `AGY_FAST` |
+| **Phase 2: Spec & Tickets** | [`to-spec`](.agents/skills/to-spec/SKILL.md), [`to-tickets`](.agents/skills/to-tickets/SKILL.md) | `antigravity::gemini-3.8-flash-high` | `AGY_FAST` |
+| **Phase 3a: Build (UI / CRUD)** | [`poteto-mode`](.agents/skills/poteto-mode/SKILL.md) ([`autopilot-full`](.agents/skills/poteto-mode/playbooks/autopilot-full.md)) + [`tdd`](.agents/skills/tdd/SKILL.md) | `antigravity::gemini-3.8-flash-medium` | `AGY_FAST` |
 | **Phase 3b: Build (Backend / Complex)** | [`poteto-mode`](.agents/skills/poteto-mode/SKILL.md) ([`autopilot-full`](.agents/skills/poteto-mode/playbooks/autopilot-full.md)) + [`tdd`](.agents/skills/tdd/SKILL.md) | `grok::grok-4.7-build-fast` (`reasoningEffort: medium`) | `GROK_WORK` |
-| **Phase 4a: Runtime Verification** | [`verify-app`](.agents/skills/verify-app/SKILL.md) (`verify-<app>`) | `antigravity::gemini-3.8-flash-high` | `AGY_FAST` |
+| **Phase 4a: Runtime Verification** | [`verify-app`](.agents/skills/verify-app/SKILL.md) (`verify-<app>`) | `antigravity::gemini-3.8-flash-medium` | `AGY_FAST` |
 | **Phase 4b: Independent Audit** | Adversarial diff & spec interrogation | `grok::grok-4.7` (`reasoningEffort: high`) | `GROK_AUDIT` |
-| **Rework Escalation (max 2)** | Scoped repair from 4a/4b findings | `antigravity::gemini-4-argon-high` (`maxRetries: 2`) | `AGY_PRO` |
+| **Rework Escalation (max 2)** | Scoped repair from 4a/4b findings | `antigravity::gemini-3.8-flash-high` (`maxRetries: 2`) | `AGY_FAST` |
 
 ### Strict Invariants
 - **Zero Paid API Keys**: Never require or read `GEMINI_API_KEY`, `XAI_API_KEY`, `CURSOR_API_KEY`, `ANTHROPIC_API_KEY`, or `OPENAI_API_KEY`. All models run through authenticated sessions.
 - **100% Claude-Free**: Never route tasks to Claude models (`disallowClaude: true`).
-- **Model Separation on Audit & Rework**: Rework escalates to `antigravity::gemini-4-argon-high` (up to 2 attempts) so the rework builder is always a different model family from the `grok::grok-4.7` auditor.
+- **Zero Argon Usage**: Argon models have hit usage limits and are completely retired across all orchestration.
+- **Model Separation on Audit & Rework**: Rework escalates to `antigravity::gemini-3.8-flash-high` (up to 2 attempts) so the rework builder is always a different model family from the `grok::grok-4.7` auditor.
+- **Gemini Flash Effort Rule**: Effort level is chosen strictly by task complexity:
+  - `low` (`gemini-3.8-flash-low`) for scout & simple tasks (`Phase 0 Context Scout`).
+  - `medium` (`gemini-3.8-flash-medium`) for normal work (`Phase 3a UI/CRUD Build`, `Phase 4a Runtime Verification`).
+  - `high` (`gemini-3.8-flash-high`) for plan / spec / hard problems (`Phase 1 Discovery & Grilling`, `Phase 2 Spec & Tickets`, and rework escalation).
 
 ---
 
@@ -85,15 +90,15 @@ Execution follows the official pstack [`poteto-mode`](.agents/skills/poteto-mode
 
 1. **Parallel Worktrees (Max Concurrency = 3)**:
    - Run at most **3 concurrent ticket owners** in isolated Git worktrees branched directly off `main` (never stacked).
-   - Route standard UI/CRUD tickets to `antigravity::gemini-3.8-flash-high` ([`.cursor/agents/builder-flash.md`](.cursor/agents/builder-flash.md)) and complex backend/DB/concurrency/security/architecture tickets to `grok::grok-4.7-build-fast` ([`.cursor/agents/builder-grok.md`](.cursor/agents/builder-grok.md)).
+   - Route standard UI/CRUD tickets to `antigravity::gemini-3.8-flash-medium` ([`.cursor/agents/builder-flash.md`](.cursor/agents/builder-flash.md)) and complex backend/DB/concurrency/security/architecture tickets to `grok::grok-4.7-build-fast` ([`.cursor/agents/builder-grok.md`](.cursor/agents/builder-grok.md)).
 2. **Independent Verification Before Merge**:
    - Green CI (`ci`) alone **never** authorizes a merge.
    - Before merging, every PR must pass:
      - **Green CI check (`ci`)** on the current head rebased onto `main`.
-     - **Phase 4a Runtime Verification** (`antigravity::gemini-3.8-flash-high`) running `.agents/skills/verify-app` (or `verify-<app>`) against a disposable instance with artifacts saved under `artifacts/<work-item-id>/`.
+     - **Phase 4a Runtime Verification** (`antigravity::gemini-3.8-flash-medium`) running `.agents/skills/verify-app` (or `verify-<app>`) against a disposable instance with artifacts saved under `artifacts/<work-item-id>/`.
      - **Phase 4b Independent Interrogation** (`grok::grok-4.7`, `reasoningEffort: high`, [`.cursor/agents/interrogator-grok.md`](.cursor/agents/interrogator-grok.md)) auditing the diff, spec, and verification evidence (`verdict: PASS`).
 3. **Rework Escalation (Up to 2 Attempts)**:
-   - If Phase 4a or Phase 4b fails, increment `retryCount` and escalate the rework pass to **`antigravity::gemini-4-argon-high`** (`maxRetries: 2`).
+   - If Phase 4a or Phase 4b fails, increment `retryCount` and escalate the rework pass to **`antigravity::gemini-3.8-flash-high`** (`maxRetries: 2`).
    - If the ticket still fails after 2 rework attempts, set `status: "blocked"`, `waitingOn: "blocked"`, and stop for human intervention.
 4. **Squash Merge & Auto-Closing Issues**:
    - Every PR body MUST use `Closes #N` (never `Refs #N`) so the issue closes automatically when the PR merges; for epics, the last (deploy) sub-issue PR also includes `Closes #EPIC`. Agents never close issues by hand.
