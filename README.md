@@ -24,8 +24,8 @@ cd <name>
 [`./scripts/init.sh`](scripts/init.sh) is 100% idempotent and safe to re-run at any time without duplicate side effects. It:
 1. Verifies required CLI tools (`git`, `gh` authenticated, `node`, `npx`).
 2. Installs/restores all official skills pinned by commit SHA and hash in [`skills-lock.json`](skills-lock.json) into `.agents/skills/`.
-3. Creates/updates GitHub repository labels (including `agent` and `epic`) via [`./scripts/setup-labels.sh`](scripts/setup-labels.sh).
-4. Configures GitHub merge policy via `gh api PATCH` (`allow_auto_merge=true`, `allow_squash_merge=true`, `delete_branch_on_merge=true`) and **Branch protection on `main`** via `gh api PUT` with the required status check **`ci`**. If a repository is private on GitHub Free (`403 / upgrade`), it emits a clear, explicit warning instead of failing silently.
+3. Creates/updates GitHub repository labels (`agent`, `epic`, `deploy`, `bug`, etc.) via [`./scripts/setup-labels.sh`](scripts/setup-labels.sh).
+4. Configures GitHub merge policy via `gh api PATCH` (`allow_auto_merge=true`, `allow_squash_merge=true`, `delete_branch_on_merge=false`) and **Branch protection on `main`** via `gh api PUT` with the required status check **`ci`**. If a repository is private on GitHub Free (`403 / upgrade`), it emits a clear, explicit warning instead of failing silently.
 5. Checks `gh secret list` for `GROK_WEBHOOK_URL` and `GROK_WEBHOOK_AUTH`, interactively running `gh secret set` (hidden input) for any missing secret when a TTY is present, or printing a clear reminder without failing if skipped or run non-interactively.
 6. Updates the project slug in [`.factory/config.json`](.factory/config.json) and prints the optional T3 Code project registration command.
 
@@ -52,38 +52,32 @@ Inside any working repository derived from this template (or from a template che
 
 ## Workflow Overview
 
-1. **Intake (`agent` & `epic` labels)**:
+1. **Intake & Dispatch Routing (`agent`, `bug`, `epic` labels)**:
    - Only GitHub Issues or Linear Issues labeled with **`agent`** are ingested. Everything else is ignored.
-   - [`.github/workflows/notify-grok.yml`](.github/workflows/notify-grok.yml) triggers on `issues` (`types: [labeled]`) when `github.event.label.name == 'agent'` and `POST`s the GitHub event payload to `GROK_WEBHOOK_URL` (with `Authorization: $GROK_WEBHOOK_AUTH`), exiting `0` with a `::notice::` if either secret is unset.
-   - **Normal vs. Epic Issues**:
-     - **`agent` alone** = normal issue (full plan, build, verify, and merge pipeline). Its PR body uses `Closes #N` (never `Refs #N`) so the issue closes when the PR merges.
-     - **`epic` + `agent`** = planning-only thread that splits the work into sub-issues labeled `agent` (`Part of #N`), where the last sub-issue is deploy. Each sub-issue PR uses `Closes #N`, and the last (deploy) sub-issue PR also includes `Closes #EPIC` so the epic closes when the deploy PR merges. **Add `epic` before `agent`** so the `epic` label is already present on the issue payload when adding `agent` triggers `notify-grok.yml`.
-     - **Issue Closing**: Agents never close issues by hand; issues close only when their PR merges.
-2. **Planning (`mattpocock/skills`)**:
-   - Uses the full official skills installed from `mattpocock/skills` and locked in [`skills-lock.json`](skills-lock.json):
-     - [`wayfinder`](.agents/skills/wayfinder/SKILL.md)
-     - [`grill-with-docs`](.agents/skills/grill-with-docs/SKILL.md) (full standalone skill with `ADR-FORMAT.md` & `CONTEXT-FORMAT.md`)
-     - [`grilling`](.agents/skills/grilling/SKILL.md) & [`domain-modeling`](.agents/skills/domain-modeling/SKILL.md)
-     - [`to-spec`](.agents/skills/to-spec/SKILL.md)
-     - [`to-tickets`](.agents/skills/to-tickets/SKILL.md)
-     - [`tdd`](.agents/skills/tdd/SKILL.md) (seam-based red-green loop with `tests.md` & `mocking.md`)
-3. **Grilling (Deduce First, Ask 2–3 Questions & Stop)**:
-   - The agent resolves everything deducible from the codebase and docs first.
-   - Any remaining non-deducible ambiguity is asked in a **single numbered block of 2–3 independent questions**, and the agent **STOPS** waiting for the reply via **Grok Bot**.
+   - [`.github/workflows/notify-grok.yml`](.github/workflows/notify-grok.yml) triggers on `issues` (`opened`, `labeled`) and passes the full event payload enriched with explicit top-level `labels` to `GROK_WEBHOOK_URL` (with `Authorization: $GROK_WEBHOOK_AUTH`).
+   - **Double-Fire Prevention**: Checks `created_at != updated_at` on `labeled` events so issues created with template labels only fire once on `opened`.
+   - **Skill Routing Matrix**:
+     - **`epic` + `agent`** -> **[`plan-epic`](.agents/skills/plan-epic/SKILL.md)**: Planning-only flow that decomposes an epic into vertical tracer-bullet sub-issues. Every created sub-issue MUST have `agent`; exactly one final sub-issue receives `deploy`. Label existence is verified before ending.
+     - **`bug` + `agent`** -> **[`fix-bug`](.agents/skills/fix-bug/SKILL.md)**: Reproduction-first defect workflow. Reproduces first (if not reproducible, stops and asks in thread final message) -> failing test -> root cause fix (`ce-debug`, `tdd`, `principle-fix-root-causes`) -> verifies all tests + runs app once -> Grok audit -> PR `Closes #N` -> merge on green CI.
+     - **`agent` alone (or with `feature`)** -> **[`implement-ticket`](.agents/skills/implement-ticket/SKILL.md)**: Standard feature pipeline orchestrating plan (`wayfinder` + `grill-with-docs`) -> build (`poteto-mode`) -> Grok audit -> rework -> PR `Closes #N` -> squash merge on green CI. Deploys only if the issue carries the `deploy` label.
+2. **Communication Discipline**:
+   - **Never comment on GitHub/Linear issues or PRs**.
+   - If clarification or reproduction guidance is needed for César, the agent stops immediately and writes the questions in the **thread final message**. The external dispatcher (**Grok Bot**) relays it to César.
+3. **Planning (`mattpocock/skills`)**:
+   - Uses official skills pinned in [`skills-lock.json`](skills-lock.json): [`wayfinder`](.agents/skills/wayfinder/SKILL.md), [`grill-with-docs`](.agents/skills/grill-with-docs/SKILL.md), [`grilling`](.agents/skills/grilling/SKILL.md), [`domain-modeling`](.agents/skills/domain-modeling/SKILL.md), [`to-spec`](.agents/skills/to-spec/SKILL.md), [`to-tickets`](.agents/skills/to-tickets/SKILL.md), and [`tdd`](.agents/skills/tdd/SKILL.md).
 4. **Build & Merge (`pstack` `poteto-mode` · `Autopilot-full`)**:
-   - Uses official [`poteto-mode`](.agents/skills/poteto-mode/SKILL.md) (`cursor/plugins`, locked in [`skills-lock.json`](skills-lock.json)) under the [`Autopilot-full`](.agents/skills/poteto-mode/playbooks/autopilot-full.md) playbook + [`tdd`](.agents/skills/tdd/SKILL.md).
-   - Runs up to **3 concurrent worktrees** off `main`.
-   - Every PR body uses `Closes #N` (never `Refs #N`) so the issue closes when the PR merges; for epics, the last (deploy) sub-issue PR also includes `Closes #EPIC`. Agents never close issues by hand.
-   - Merges via **squash merge** only when **`ci` is green** AND **independent verification** ([`verify-app`](.agents/skills/verify-app/SKILL.md) runtime proof + `grok-4.7` adversarial interrogation) passes.
+   - Follows official [`poteto-mode`](.agents/skills/poteto-mode/SKILL.md) under the [`Autopilot-full`](.agents/skills/poteto-mode/playbooks/autopilot-full.md) playbook + [`tdd`](.agents/skills/tdd/SKILL.md).
+   - Every PR body uses `Closes #N` (never `Refs #N`). For epics, the final deploy sub-issue PR also includes `Closes #EPIC`.
+   - Merges via **squash merge** (`gh pr merge <PR_NUMBER> --squash` without `--delete-branch`) only when **`ci` is green** AND **independent verification + Grok audit** pass. Branches are never deleted.
 
 ---
 
-## Model Orchestration (Zero API Keys, Zero Claude)
+## Model Orchestration (Zero API Keys, Zero Claude, Zero Argon)
 
 | Role | Provider & Model | Pool | Notes |
 | :--- | :--- | :--- | :--- |
 | **Context Scout** | `antigravity::gemini-3.8-flash-low` | `AGY_FAST` | Fast repo scout & context brief (`<2KB`), low effort |
-| **Spec & Plan** | `antigravity::gemini-3.8-flash-high` | `AGY_FAST` | `wayfinder`, `grill-with-docs`, `to-spec`, `to-tickets`, high effort |
+| **Spec & Plan** | `antigravity::gemini-3.8-flash-high` | `AGY_FAST` | `wayfinder`, `grill-with-docs`, `to-spec`, `plan-epic`, high effort |
 | **Build (UI / CRUD)** | `antigravity::gemini-3.8-flash-medium` | `AGY_FAST` | Standard UI, CRUD, frontend, docs slices, medium effort |
 | **Build (Backend)** | `grok::grok-4.7-build-fast` | `GROK_WORK` | DB, SQL, concurrency, security, state machines (`reasoningEffort: medium`) |
 | **Runtime Verify** | `antigravity::gemini-3.8-flash-medium` | `AGY_FAST` | Drives `.agents/skills/verify-app` (`exitCode: 0`), medium effort |
@@ -105,7 +99,10 @@ Gemini Flash effort is chosen strictly according to task complexity:
 ├── AGENTS.md                                    # Agent operating contract & pipeline rules
 ├── README.md                                    # Overview & quick start
 ├── skills-lock.json                             # Locked official skills (mattpocock/skills + pstack)
-├── .agents/skills/                              # Official skills + single verify-app template
+├── .agents/skills/                              # Official skills + orchestrators + verify-app template
+│   ├── implement-ticket/                        # High-level feature orchestrator skill
+│   ├── fix-bug/                                 # High-level bug fixing orchestrator skill
+│   ├── plan-epic/                               # High-level epic planning orchestrator skill
 │   ├── wayfinder/
 │   ├── grill-with-docs/
 │   ├── grilling/
@@ -126,7 +123,7 @@ Gemini Flash effort is chosen strictly according to task complexity:
 │   ├── WORK-ITEM.example.json                   # Work-item example
 │   └── work-items/.gitkeep                      # Runtime work-items directory
 ├── .github/
-│   ├── ISSUE_TEMPLATE/                          # Human feature.md, bug.md, and config.yml
+│   ├── ISSUE_TEMPLATE/                          # Issue forms (bug.yml, feature.md, config.yml)
 │   ├── PULL_REQUEST_TEMPLATE.md                 # Generic PR receipt template
 │   └── workflows/
 │       ├── ci.yml                               # Generic CI workflow (stable check name: `ci`)

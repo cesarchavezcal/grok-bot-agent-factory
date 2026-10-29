@@ -14,7 +14,7 @@
     "maxConcurrency": 3
   },
   "planning": {
-    "skills": ["wayfinder", "grill-with-docs", "grilling", "domain-modeling", "to-spec", "to-tickets", "tdd"],
+    "skills": ["implement-ticket", "fix-bug", "plan-epic", "wayfinder", "grill-with-docs", "grilling", "domain-modeling", "to-spec", "to-tickets", "tdd"],
     "grilling": {
       "deduceFromCodeAndDocsFirst": true,
       "minQuestionsPerBlock": 2,
@@ -32,7 +32,7 @@
   },
   "delivery": {
     "mergeMethod": "squash",
-    "deleteBranchOnMerge": true,
+    "deleteBranchOnMerge": false,
     "allowAutoMerge": true,
     "requireGreenCI": true,
     "requiredCheckName": "ci",

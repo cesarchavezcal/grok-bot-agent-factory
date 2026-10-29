@@ -2,7 +2,11 @@ name: Notify Grok Bot
 
 on:
   issues:
-    types: [labeled]
+    types: [opened, labeled]
+
+concurrency:
+  group: notify-grok-${{ github.event.issue.number }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -11,7 +15,9 @@ permissions:
 jobs:
   notify-grok:
     name: notify-grok
-    if: github.event.label.name == 'agent'
+    if: >-
+      (github.event.action == 'opened' && contains(github.event.issue.labels.*.name, 'agent')) ||
+      (github.event.action == 'labeled' && github.event.label.name == 'agent' && github.event.issue.created_at != github.event.issue.updated_at)
     runs-on: ubuntu-latest
     steps:
       - name: Send issue event to Grok Bot webhook
@@ -23,7 +29,7 @@ jobs:
             echo "::notice::Skipping Grok webhook notification: GROK_WEBHOOK_URL or GROK_WEBHOOK_AUTH secret is not set."
             exit 0
           fi
-          curl -fsS -X POST "$URL" \
+          jq '.labels = [(.issue.labels // [])[].name]' "$GITHUB_EVENT_PATH" | curl -fsS -X POST "$URL" \
             -H "Authorization: $AUTH" \
             -H "Content-Type: application/json" \
-            --data @"$GITHUB_EVENT_PATH"
+            --data-binary @-

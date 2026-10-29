@@ -24,37 +24,42 @@ What [`./scripts/init.sh`](scripts/init.sh) does (idempotent, safe to re-run at 
 2. **Official Skills Sync**: Installs/restores the full official skills pinned by commit SHA and hash in [`skills-lock.json`](skills-lock.json):
    - From `mattpocock/skills`: [`wayfinder`](.agents/skills/wayfinder/SKILL.md), [`grill-with-docs`](.agents/skills/grill-with-docs/SKILL.md) (full standalone skill with `ADR-FORMAT.md` & `CONTEXT-FORMAT.md`), [`grilling`](.agents/skills/grilling/SKILL.md), [`domain-modeling`](.agents/skills/domain-modeling/SKILL.md), [`to-spec`](.agents/skills/to-spec/SKILL.md), [`to-tickets`](.agents/skills/to-tickets/SKILL.md), and [`tdd`](.agents/skills/tdd/SKILL.md) (with `tests.md` & `mocking.md`).
    - From `cursor/plugins` (`pstack`): [`poteto-mode`](.agents/skills/poteto-mode/SKILL.md) (including `playbooks/autopilot-full.md`).
+   - Factory orchestrators: [`implement-ticket`](.agents/skills/implement-ticket/SKILL.md), [`fix-bug`](.agents/skills/fix-bug/SKILL.md), [`plan-epic`](.agents/skills/plan-epic/SKILL.md).
    - Checks local [`.agents/skills/verify-app/SKILL.md`](.agents/skills/verify-app/SKILL.md).
-3. **GitHub Labels**: Runs [`./scripts/setup-labels.sh`](scripts/setup-labels.sh) to ensure the `agent` trigger label, `epic` planning label, and workflow state labels exist (and prints the Linear `agent` label note).
+3. **GitHub Labels**: Runs [`./scripts/setup-labels.sh`](scripts/setup-labels.sh) to ensure `agent`, `epic`, `deploy`, `bug`, and workflow state labels exist.
 4. **Merge Policy & Branch Protection (`gh api`)**:
-   - Calls `gh api PATCH repos/<owner>/<repo>` to enable `allow_auto_merge=true`, `allow_squash_merge=true`, `allow_merge_commit=false`, `allow_rebase_merge=false`, and `delete_branch_on_merge=true`.
+   - Calls `gh api PATCH repos/<owner>/<repo>` to enable `allow_auto_merge=true`, `allow_squash_merge=true`, `allow_merge_commit=false`, `allow_rebase_merge=false`, and `delete_branch_on_merge=false` (branches are preserved).
    - Calls `gh api PUT repos/<owner>/<repo>/branches/main/protection` to protect `main` with the required status check **`ci`** (`strict: true`), linear history, and conversation resolution.
    - If the repository is private on a GitHub Free plan (API returns `403 / Upgrade to GitHub Pro`), it prints an **explicit warning** with the command to make the working repo public (`gh repo edit <repo> --visibility public --accept-visibility-change-consequences`) and does not fail silently.
 5. **Factory Config & T3 Registration**: Updates the `app` slug in [`.factory/config.json`](.factory/config.json) and prints the optional T3 Code registration call (`t3_project_create`).
 
 ---
 
-## 1. Intake Rule (`agent` & `epic` Label Gate)
+## 1. Intake & Routing Matrix (`agent`, `bug`, `epic` Labels)
 
 - **Entry Condition**: Only issues from **GitHub Issues** or **Linear** carrying the **`agent`** label are eligible for execution.
 - **Ignore Rule**: Any issue without the `agent` label MUST be ignored completely.
-- **Normal vs. Epic Flow**:
-  - **`agent` alone**: Normal issue — executes the standard plan, build, verify, and merge pipeline. Its PR body MUST include `Closes #N` (never `Refs #N`) so the issue closes automatically when the PR merges.
-  - **`epic` + `agent`**: Planning-only thread that splits the epic into sub-issues labeled `agent` (`Part of #N`), where the last sub-issue is deploy. Each sub-issue PR includes `Closes #N` (never `Refs #N`), and the last (deploy) sub-issue PR also includes `Closes #EPIC` so merging the final PR closes both the deploy sub-issue and the parent epic. Do not write or merge implementation code directly on the epic thread.
-  - **Issue Closing Rule**: Agents never close issues by hand; issues close only when a PR with `Closes #N` (and `Closes #EPIC` on the final deploy sub-issue PR) merges.
-  - **Labeling Order**: Always add **`epic` before `agent`** so the `epic` label is already present on the issue when adding `agent` triggers `.github/workflows/notify-grok.yml`.
+- **Routing Matrix**:
+  - **`epic` + `agent`** -> **[`plan-epic`](.agents/skills/plan-epic/SKILL.md)**: Planning-only thread that splits an epic into vertical sub-issues (`Part of #N`). Every created sub-issue MUST receive the `agent` label; exactly one final sub-issue receives the `deploy` label. Verify all sub-issues have `agent` before completing.
+  - **`bug` + `agent`** -> **[`fix-bug`](.agents/skills/fix-bug/SKILL.md)**: Reads issue/error/logs -> reproduces first (if it cannot reproduce, stop and ask César in thread final message) -> writes failing test -> fixes root cause (`ce-debug`, `tdd`, `principle-fix-root-causes`) -> verifies all tests + runs the app once -> Grok audit -> PR `Closes #N` -> squash merge on green CI.
+  - **`agent` alone (or with `feature`)** -> **[`implement-ticket`](.agents/skills/implement-ticket/SKILL.md)**: Full lifecycle feature delivery: plan (`grill-with-docs` + `wayfinder`) -> build (`poteto-mode` reproduce, test, fix, verify) -> Grok audit -> rework rule -> PR `Closes #N` -> squash merge on green CI.
+- **Deploy Rule**:
+  - Deploy only in the last sub-issue of an epic (carrying the **`deploy`** label), after its green merge.
+  - Intermediate sub-issues never deploy.
+- **Issue Closing Rule**:
+  - PR bodies MUST use `Closes #N` (never `Refs #N`) so the issue closes automatically when the PR merges; for epics, the final deploy sub-issue PR also includes `Closes #EPIC`.
+  - Agents never close issues by hand; issues close only when their PR merges.
 - **Work-Item State**: Each accepted issue is tracked in `.factory/work-items/<id>.json` following [`.factory/work-item.schema.json`](.factory/work-item.schema.json). Do not commit runtime work-item JSON files unless explicitly asked.
 
 ---
 
-## 2. Pipeline Stages & Official Skills
+## 2. Pipeline Stages & Skills
 
-| Stage | Primary Skill(s) | Active Model (`provider::model`) | Pool |
-| :--- | :--- | :--- | :--- |
+| Stage | Primary Skill(s) | Active Model (`provider::model`) | Pool |\n| :--- | :--- | :--- | :--- |
 | **Phase 0: Context Scout** | Repo exploration & context brief (`<2KB`) | `antigravity::gemini-3.8-flash-low` | `AGY_FAST` |
 | **Phase 1: Discovery & Grilling** | [`wayfinder`](.agents/skills/wayfinder/SKILL.md), [`grill-with-docs`](.agents/skills/grill-with-docs/SKILL.md), [`grilling`](.agents/skills/grilling/SKILL.md), [`domain-modeling`](.agents/skills/domain-modeling/SKILL.md) | `antigravity::gemini-3.8-flash-high` | `AGY_FAST` |
-| **Phase 2: Spec & Tickets** | [`to-spec`](.agents/skills/to-spec/SKILL.md), [`to-tickets`](.agents/skills/to-tickets/SKILL.md) | `antigravity::gemini-3.8-flash-high` | `AGY_FAST` |
-| **Phase 3a: Build (UI / CRUD)** | [`poteto-mode`](.agents/skills/poteto-mode/SKILL.md) ([`autopilot-full`](.agents/skills/poteto-mode/playbooks/autopilot-full.md)) + [`tdd`](.agents/skills/tdd/SKILL.md) | `antigravity::gemini-3.8-flash-medium` | `AGY_FAST` |
+| **Phase 2: Spec & Tickets** | [`to-spec`](.agents/skills/to-spec/SKILL.md), [`to-tickets`](.agents/skills/to-tickets/SKILL.md), [`plan-epic`](.agents/skills/plan-epic/SKILL.md) | `antigravity::gemini-3.8-flash-high` | `AGY_FAST` |
+| **Phase 3a: Build (UI / CRUD / Standard)** | [`poteto-mode`](.agents/skills/poteto-mode/SKILL.md) ([`autopilot-full`](.agents/skills/poteto-mode/playbooks/autopilot-full.md)) + [`tdd`](.agents/skills/tdd/SKILL.md) | `antigravity::gemini-3.8-flash-medium` | `AGY_FAST` |
 | **Phase 3b: Build (Backend / Complex)** | [`poteto-mode`](.agents/skills/poteto-mode/SKILL.md) ([`autopilot-full`](.agents/skills/poteto-mode/playbooks/autopilot-full.md)) + [`tdd`](.agents/skills/tdd/SKILL.md) | `grok::grok-4.7-build-fast` (`reasoningEffort: medium`) | `GROK_WORK` |
 | **Phase 4a: Runtime Verification** | [`verify-app`](.agents/skills/verify-app/SKILL.md) (`verify-<app>`) | `antigravity::gemini-3.8-flash-medium` | `AGY_FAST` |
 | **Phase 4b: Independent Audit** | Adversarial diff & spec interrogation | `grok::grok-4.7` (`reasoningEffort: high`) | `GROK_AUDIT` |
@@ -62,25 +67,26 @@ What [`./scripts/init.sh`](scripts/init.sh) does (idempotent, safe to re-run at 
 
 ### Strict Invariants
 - **Zero Paid API Keys**: Never require or read `GEMINI_API_KEY`, `XAI_API_KEY`, `CURSOR_API_KEY`, `ANTHROPIC_API_KEY`, or `OPENAI_API_KEY`. All models run through authenticated sessions.
-- **100% Claude-Free**: Never route tasks to Claude models (`disallowClaude: true`).
-- **Zero Argon Usage**: Argon models have hit usage limits and are completely retired across all orchestration.
+- **100% Claude & GPT Free**: Never route tasks to Claude or GPT models (`disallowClaude: true`).
+- **Zero Argon Usage**: Argon models are completely retired across all orchestration (`forbidArgon: true`).
 - **Model Separation on Audit & Rework**: Rework escalates to `antigravity::gemini-3.8-flash-high` (up to 2 attempts) so the rework builder is always a different model family from the `grok::grok-4.7` auditor.
-- **Gemini Flash Effort Rule**: Effort level is chosen strictly by task complexity:
-  - `low` (`gemini-3.8-flash-low`) for scout & simple tasks (`Phase 0 Context Scout`).
-  - `medium` (`gemini-3.8-flash-medium`) for normal work (`Phase 3a UI/CRUD Build`, `Phase 4a Runtime Verification`).
-  - `high` (`gemini-3.8-flash-high`) for plan / spec / hard problems (`Phase 1 Discovery & Grilling`, `Phase 2 Spec & Tickets`, and rework escalation).
+- **Task-Based Effort Scaling**:
+  - `low` (`gemini-3.8-flash-low`) for scout & simple tasks.
+  - `medium` (`gemini-3.8-flash-medium`) for normal work (UI/CRUD build, runtime verification).
+  - `high` (`gemini-3.8-flash-high`) for plan / spec / hard problems / rework.
 
 ---
 
-## 3. Grilling Protocol (Stop & Wait for Grok Bot)
+## 3. Communication Rules (Zero Issue/PR Comments)
 
-During **Planning / Grilling** (`grill-with-docs` / `wayfinder`):
-1. **Self-Deduction First**: Explore the repository, types, tests, ADRs, and existing docs to answer every question that can be deduced from code. Never ask a human what the repository already answers.
-2. **Batched Clarification Block (2–3 Questions)**: If genuine product, scope, or trade-off ambiguities remain that cannot be deduced from the repo:
-   - Formulate a **single numbered list of 2 to 3 independent, high-leverage questions**.
-   - Record the questions in `.factory/work-items/<id>.json` under `pendingQuestions`, set `stage: "grilling"`, `status: "blocked"`, and `waitingOn: "human"`.
-   - Post the numbered block to the issue / dispatcher output and **STOP immediately**.
-3. **Resume on Dispatcher Reply**: Do not guess or proceed until the human reply arrives via the external dispatcher (**Grok Bot**). Once answered, lock decisions into docs/spec via `to-spec` and slice vertical tracer-bullet tickets via `to-tickets`.
+- **NEVER comment on issues or PRs**.
+- When a bug cannot be reproduced, or when grilling/clarification is needed for César:
+  1. **Self-Deduction First**: Explore the repository, types, tests, ADRs, and existing docs to answer every question that can be deduced from code.
+  2. **Thread Final Message**: If genuine ambiguities or reproduction blockers remain:
+     - Formulate a numbered block of questions or reproduction findings.
+     - Write them directly in the **thread final message**.
+     - Stop execution immediately.
+     - The external dispatcher (**Grok Bot**) relays the questions to César. Do NOT post comments on GitHub or Linear.
 
 ---
 
@@ -90,16 +96,19 @@ Execution follows the official pstack [`poteto-mode`](.agents/skills/poteto-mode
 
 1. **Parallel Worktrees (Max Concurrency = 3)**:
    - Run at most **3 concurrent ticket owners** in isolated Git worktrees branched directly off `main` (never stacked).
-   - Route standard UI/CRUD tickets to `antigravity::gemini-3.8-flash-medium` ([`.cursor/agents/builder-flash.md`](.cursor/agents/builder-flash.md)) and complex backend/DB/concurrency/security/architecture tickets to `grok::grok-4.7-build-fast` ([`.cursor/agents/builder-grok.md`](.cursor/agents/builder-grok.md)).
 2. **Independent Verification Before Merge**:
    - Green CI (`ci`) alone **never** authorizes a merge.
    - Before merging, every PR must pass:
      - **Green CI check (`ci`)** on the current head rebased onto `main`.
-     - **Phase 4a Runtime Verification** (`antigravity::gemini-3.8-flash-medium`) running `.agents/skills/verify-app` (or `verify-<app>`) against a disposable instance with artifacts saved under `artifacts/<work-item-id>/`.
+     - **Phase 4a Runtime Verification** (`antigravity::gemini-3.8-flash-medium`) running `.agents/skills/verify-app` (or `verify-<app>`) with `exitCode === 0`.
      - **Phase 4b Independent Interrogation** (`grok::grok-4.7`, `reasoningEffort: high`, [`.cursor/agents/interrogator-grok.md`](.cursor/agents/interrogator-grok.md)) auditing the diff, spec, and verification evidence (`verdict: PASS`).
 3. **Rework Escalation (Up to 2 Attempts)**:
    - If Phase 4a or Phase 4b fails, increment `retryCount` and escalate the rework pass to **`antigravity::gemini-3.8-flash-high`** (`maxRetries: 2`).
    - If the ticket still fails after 2 rework attempts, set `status: "blocked"`, `waitingOn: "blocked"`, and stop for human intervention.
-4. **Squash Merge & Auto-Closing Issues**:
-   - Every PR body MUST use `Closes #N` (never `Refs #N`) so the issue closes automatically when the PR merges; for epics, the last (deploy) sub-issue PR also includes `Closes #EPIC`. Agents never close issues by hand.
-   - Once `ci` is green and both Phase 4a and Phase 4b pass on the `main`-rebased head, merge via **squash merge** (`gh pr merge --squash --delete-branch`).
+4. **Squash Merge & Branch Preservation**:
+   - Every PR body MUST use `Closes #N` (never `Refs #N`). For epics, the final deploy sub-issue PR also includes `Closes #EPIC`.
+   - Once `ci` is green and both Phase 4a and Phase 4b pass on the `main`-rebased head, merge via **squash merge**:
+     ```bash
+     gh pr merge <PR_NUMBER> --squash
+     ```
+   - **Strict Rule**: NEVER pass `--delete-branch`. Never delete branches.
