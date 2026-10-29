@@ -64,7 +64,7 @@ Publish the approved tickets. **How** depends on the tracker `/setup-matt-pocock
 
 Work the **frontier**: any ticket whose blockers are all done. For a purely linear chain that means top to bottom.
 
-Do NOT close or modify any parent issue.
+Do NOT close or modify any issue or parent epic by hand. Each ticket's PR uses `Closes #N` (never `Refs #N`) so the issue closes when the PR merges, and for an epic the last (deploy) sub-issue PR also includes `Closes #EPIC` so merging the final PR closes both the deploy sub-issue and the parent epic.
 
 <local-ticket-template>
 

@@ -42,8 +42,9 @@ This creates/updates:
 - `in-progress` (`#1D76DB`), `rework` (`#D93F0B`), `ready-to-merge` (`#5319E7`), `feature` (`#A2EEEF`), `bug` (`#D73A4A`).
 
 ### Issue Modes (`epic` + `agent` vs. `agent` alone)
-- **`agent` alone**: Treated as a normal issue (executes the standard plan, build, verify, and merge pipeline).
-- **`epic` + `agent`**: Runs as a planning-only thread that creates sub-issues labeled `agent` (referencing `"Part of #N"`), where the last sub-issue is deploy.
+- **`agent` alone**: Treated as a normal issue (executes the standard plan, build, verify, and merge pipeline). Its PR body uses `Closes #N` (never `Refs #N`) so the issue closes automatically when the PR merges.
+- **`epic` + `agent`**: Runs as a planning-only thread that creates sub-issues labeled `agent` (referencing `"Part of #N"`), where the last sub-issue is deploy. Each sub-issue PR uses `Closes #N` (never `Refs #N`), and the last (deploy) sub-issue PR also includes `Closes #EPIC` so merging the final PR closes both the deploy sub-issue and the parent epic.
+- **Issue closing**: Agents never close issues by hand; issues close only when their PR merges.
 - **Labeling order (`epic` before `agent`)**: Because `.github/workflows/notify-grok.yml` triggers when the `agent` label is added, **always add `epic` before `agent`** so `epic` is already present in the webhook payload when `agent` dispatches the issue.
 
 ### Linear
@@ -75,7 +76,7 @@ If either `GROK_WEBHOOK_URL` or `GROK_WEBHOOK_AUTH` is not configured when an is
 
 ## 3. Allow Auto-Merge, Squash Merge & Delete Branch on Merge
 
-The `Autopilot-full` playbook merges PRs via **squash merge** once both the **`ci`** status check and independent verification (`verify-app` + Grok 4.7 interrogation) pass.
+The `Autopilot-full` playbook merges PRs via **squash merge** once both the **`ci`** status check and independent verification (`verify-app` + Grok 4.7 interrogation) pass. Every PR body uses `Closes #N` (never `Refs #N`) so the issue closes when the PR merges, and for epics the last (deploy) sub-issue PR also includes `Closes #EPIC`; agents never close issues by hand.
 
 ### CLI (`gh api PATCH`)
 ```bash

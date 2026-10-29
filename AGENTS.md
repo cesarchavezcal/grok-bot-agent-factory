@@ -39,8 +39,9 @@ What [`./scripts/init.sh`](scripts/init.sh) does (idempotent, safe to re-run at 
 - **Entry Condition**: Only issues from **GitHub Issues** or **Linear** carrying the **`agent`** label are eligible for execution.
 - **Ignore Rule**: Any issue without the `agent` label MUST be ignored completely.
 - **Normal vs. Epic Flow**:
-  - **`agent` alone**: Normal issue — executes the standard plan, build, verify, and merge pipeline.
-  - **`epic` + `agent`**: Planning-only thread that splits the epic into sub-issues labeled `agent` (`Part of #N`), where the last sub-issue is deploy. Do not write or merge implementation code directly on the epic thread.
+  - **`agent` alone**: Normal issue — executes the standard plan, build, verify, and merge pipeline. Its PR body MUST include `Closes #N` (never `Refs #N`) so the issue closes automatically when the PR merges.
+  - **`epic` + `agent`**: Planning-only thread that splits the epic into sub-issues labeled `agent` (`Part of #N`), where the last sub-issue is deploy. Each sub-issue PR includes `Closes #N` (never `Refs #N`), and the last (deploy) sub-issue PR also includes `Closes #EPIC` so merging the final PR closes both the deploy sub-issue and the parent epic. Do not write or merge implementation code directly on the epic thread.
+  - **Issue Closing Rule**: Agents never close issues by hand; issues close only when a PR with `Closes #N` (and `Closes #EPIC` on the final deploy sub-issue PR) merges.
   - **Labeling Order**: Always add **`epic` before `agent`** so the `epic` label is already present on the issue when adding `agent` triggers `.github/workflows/notify-grok.yml`.
 - **Work-Item State**: Each accepted issue is tracked in `.factory/work-items/<id>.json` following [`.factory/work-item.schema.json`](.factory/work-item.schema.json). Do not commit runtime work-item JSON files unless explicitly asked.
 
@@ -94,5 +95,6 @@ Execution follows the official pstack [`poteto-mode`](.agents/skills/poteto-mode
 3. **Rework Escalation (Up to 2 Attempts)**:
    - If Phase 4a or Phase 4b fails, increment `retryCount` and escalate the rework pass to **`antigravity::gemini-4-argon-high`** (`maxRetries: 2`).
    - If the ticket still fails after 2 rework attempts, set `status: "blocked"`, `waitingOn: "blocked"`, and stop for human intervention.
-4. **Squash Merge**:
+4. **Squash Merge & Auto-Closing Issues**:
+   - Every PR body MUST use `Closes #N` (never `Refs #N`) so the issue closes automatically when the PR merges; for epics, the last (deploy) sub-issue PR also includes `Closes #EPIC`. Agents never close issues by hand.
    - Once `ci` is green and both Phase 4a and Phase 4b pass on the `main`-rebased head, merge via **squash merge** (`gh pr merge --squash --delete-branch`).
