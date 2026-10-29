@@ -41,12 +41,13 @@ jobs:
             # Only check for duplicate creation event if issue was created in the last 60 seconds
             if [ "$AGE" -ge 0 ] && [ "$AGE" -le 60 ]; then
               TARGET_TITLE="notify-grok #$ISSUE_NUMBER (opened)"
-              # Find if an 'opened' run exists for this specific issue that succeeded or is in-progress
+              # Find if an 'opened' run exists for this specific issue that is queued, pending, in-progress, or succeeded
               OPENED_RUN=$(gh run list \
                 --workflow=notify-grok.yml \
                 --event=issues \
+                --limit 100 \
                 --json databaseId,conclusion,status,displayTitle \
-                -q "[.[] | select(.displayTitle == \"$TARGET_TITLE\" and (.conclusion == \"success\" or .status == \"in_progress\"))] | first // empty" \
+                -q "[.[] | select(.displayTitle == \"$TARGET_TITLE\" and (.status != \"completed\" or .conclusion == \"success\"))] | first // empty" \
                 2>/dev/null || true)
 
               if [ -n "$OPENED_RUN" ]; then
