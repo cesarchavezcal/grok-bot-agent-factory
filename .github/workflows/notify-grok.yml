@@ -4,36 +4,76 @@ on:
   issues:
     types: [opened, labeled]
 
-concurrency:
-  group: notify-grok-${{ github.event.issue.number }}
-  cancel-in-progress: true
-
 permissions:
   contents: read
   issues: read
+  actions: read
 
 jobs:
   notify-grok:
     name: notify-grok
     # Run when:
-    # 1. Issue is opened with the 'agent' label already applied (e.g. via issue templates or API)
+    # 1. Issue is opened with the 'agent' label already applied (e.g. via bug.yml or API)
     # 2. Issue has the 'agent' label added
     if: >-
       (github.event.action == 'opened' && contains(github.event.issue.labels.*.name, 'agent')) ||
       (github.event.action == 'labeled' && github.event.label.name == 'agent')
+    concurrency:
+      group: notify-grok-${{ github.event.issue.number }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     steps:
+      - name: Deduplicate initial creation burst
+        id: dedup
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTION: ${{ github.event.action }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          if [ "$ACTION" = "labeled" ]; then
+            # If this issue was opened with 'agent', an 'opened' run was already dispatched for it.
+            # Query recent workflow runs for this issue to detect if 'opened' already processed it.
+            PREV_OPENED_RUN=$(gh run list \
+              --workflow=notify-grok.yml \
+              --event=issues \
+              --json databaseId,conclusion,status \
+              -q ".[] | select(.databaseId != $RUN_ID and (.conclusion == \"success\" or .status == \"in_progress\")) | .databaseId" \
+              2>/dev/null | head -n 1 || true)
+
+            # Check if issue was created carrying 'agent'
+            if [ -n "$PREV_OPENED_RUN" ] && [ "${{ contains(github.event.issue.labels.*.name, 'agent') }}" = "true" ]; then
+              # Verify if the creation event already carried agent
+              CREATED_AT="${{ github.event.issue.created_at }}"
+              UPDATED_AT="${{ github.event.issue.updated_at }}"
+              # During initial creation burst, created_at and updated_at are within a few seconds
+              CREATED_EPOCH=$(date -d "$CREATED_AT" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$CREATED_AT" +%s 2>/dev/null || echo 0)
+              UPDATED_EPOCH=$(date -d "$UPDATED_AT" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$UPDATED_AT" +%s 2>/dev/null || echo 0)
+              DIFF=$(( UPDATED_EPOCH - CREATED_EPOCH ))
+              if [ "$DIFF" -ge 0 ] && [ "$DIFF" -le 10 ]; then
+                echo "duplicate=true" >> "$GITHUB_OUTPUT"
+                echo "::notice::Skipping duplicate notification: issue #$ISSUE_NUMBER was already dispatched on 'opened' (run $PREV_OPENED_RUN)."
+                exit 0
+              fi
+            fi
+          fi
+          echo "duplicate=false" >> "$GITHUB_OUTPUT"
+
       - name: Send issue event to Grok Bot webhook
+        if: steps.dedup.outputs.duplicate != 'true'
         env:
           URL: ${{ secrets.GROK_WEBHOOK_URL }}
           AUTH: ${{ secrets.GROK_WEBHOOK_AUTH }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
           if [ -z "$URL" ] || [ -z "$AUTH" ]; then
             echo "::notice::Skipping Grok webhook notification: GROK_WEBHOOK_URL or GROK_WEBHOOK_AUTH secret is not set."
             exit 0
           fi
-          jq --arg run_id "$GITHUB_RUN_ID" \
-             --arg delivery_id "${{ github.event.issue.number }}" \
+          DELIVERY_ID="${{ github.event.issue.number }}-${RUN_ID}-${RUN_ATTEMPT}"
+          jq --arg delivery_id "$DELIVERY_ID" \
+             --arg run_id "$RUN_ID" \
              '.delivery_id = $delivery_id | .run_id = $run_id | .labels = [(.issue.labels // [])[].name]' \
              "$GITHUB_EVENT_PATH" | curl -fsS -X POST "$URL" \
             -H "Authorization: $AUTH" \

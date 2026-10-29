@@ -18,6 +18,8 @@ This repository follows the **Grok Bot Agent Factory** autonomous workflow. Read
     - *Precedence*: `epic` takes priority over all other labels. If an issue carries `epic` + `bug` + `agent`, it routes to `plan-epic`.
   - **`bug` + `agent`** -> **`fix-bug`**: Read issue/error/logs -> reproduce first (if it cannot reproduce, stop and ask César in thread final message) -> write a failing test -> fix the root cause (`ce-debug`, `tdd`, `principle-fix-root-causes`) -> verify all tests + run the app once -> Grok audit -> PR `Closes #N` -> squash merge on green.
   - **`agent` alone (or with `feature`)** -> **`implement-ticket`**: Full lifecycle: plan (`grill-with-docs` + `wayfinder`) -> build (`poteto-mode` reproduce, test, fix, verify) -> Grok audit -> rework rule -> PR `Closes #N` -> squash merge on green CI.
+- **Manual Labeling Order (`epic` before `agent`)**:
+  - When manually adding labels to an existing issue in GitHub or Linear, **always add `epic` before `agent`** so `epic` is already present on the issue payload when `agent` triggers `.github/workflows/notify-grok.yml`.
 - **Deploy Rule**:
   - Deploy only on the last sub-issue of an epic (carrying the `deploy` label), after its green merge.
   - Intermediate sub-issues never deploy.

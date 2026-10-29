@@ -21,7 +21,7 @@ cd <name>
 
 What [`./scripts/init.sh`](scripts/init.sh) does (idempotent, safe to re-run at any time):
 1. **Tool & Auth Verification**: Verifies `git`, `gh` (authenticated), `node`, and `npx` with clear diagnostic messages.
-2. **Official Skills Sync**: Installs/restores official upstream skills pinned by commit SHA and hash in [`skills-lock.json`](skills-lock.json) (`wayfinder`, `grill-with-docs`, `grilling`, `domain-modeling`, `to-spec`, `to-tickets`, `tdd`, `poteto-mode`), and verifies repository orchestrators ([`implement-ticket`](.agents/skills/implement-ticket/SKILL.md), [`fix-bug`](.agents/skills/fix-bug/SKILL.md), [`plan-epic`](.agents/skills/plan-epic/SKILL.md), and [`.agents/skills/verify-app/SKILL.md`](.agents/skills/verify-app/SKILL.md)).
+2. **Official Skills Sync**: Installs/restores official upstream skills pinned by commit SHA and hash in [`skills-lock.json`](skills-lock.json) (`wayfinder`, `grill-with-docs`, `grilling`, `domain-modeling`, `to-spec`, `to-tickets`, `tdd`, `poteto-mode`), and checks that [`.agents/skills/verify-app/SKILL.md`](.agents/skills/verify-app/SKILL.md) is present.
 3. **GitHub Labels**: Runs [`./scripts/setup-labels.sh`](scripts/setup-labels.sh) to ensure `agent`, `epic`, `deploy`, `bug`, and workflow state labels exist.
 4. **Merge Policy & Branch Protection (`gh api`)**:
    - Calls `gh api PATCH repos/<owner>/<repo>` to enable `allow_auto_merge=true`, `allow_squash_merge=true`, `allow_merge_commit=false`, `allow_rebase_merge=false`, and `delete_branch_on_merge=false` (branches are preserved).
@@ -40,6 +40,8 @@ What [`./scripts/init.sh`](scripts/init.sh) does (idempotent, safe to re-run at 
     - *Precedence*: `epic` takes priority over all other labels. If an issue carries `epic` + `bug` + `agent`, it routes to `plan-epic`.
   - **`bug` + `agent`** -> **[`fix-bug`](.agents/skills/fix-bug/SKILL.md)**: Reads issue/error/logs -> reproduces first (if it cannot reproduce, stop and ask César in thread final message) -> writes failing test -> fixes root cause (`ce-debug`, `tdd`, `principle-fix-root-causes`) -> verifies all tests + runs the app once -> Grok audit -> PR `Closes #N` -> squash merge on green CI.
   - **`agent` alone (or with `feature`)** -> **[`implement-ticket`](.agents/skills/implement-ticket/SKILL.md)**: Full lifecycle feature delivery: plan (`grill-with-docs` + `wayfinder`) -> build (`poteto-mode` reproduce, test, fix, verify) -> Grok audit -> rework rule -> PR `Closes #N` -> squash merge on green CI.
+- **Manual Labeling Order (`epic` before `agent`)**:
+  - When manually adding labels to an existing issue in GitHub or Linear, **always add `epic` before `agent`** so `epic` is already present on the issue payload when `agent` triggers `.github/workflows/notify-grok.yml`.
 - **Deploy Rule**:
   - Deploy only in the last sub-issue of an epic (carrying the **`deploy`** label), after its green merge.
   - Intermediate sub-issues never deploy.
