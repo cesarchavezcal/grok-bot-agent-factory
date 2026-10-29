@@ -63,6 +63,13 @@ gh secret set GROK_WEBHOOK_AUTH
 
 If either `GROK_WEBHOOK_URL` or `GROK_WEBHOOK_AUTH` is not configured when an issue is labeled with `agent`, `.github/workflows/notify-grok.yml` logs a `::notice::` annotation and exits `0` without failing workflow runs.
 
+### Test the Grok webhook
+1. Make sure the repo secrets `GROK_WEBHOOK_URL` and `GROK_WEBHOOK_AUTH` are set.
+2. Create a test issue with the `agent` label plus one more label (for example `documentation`).
+3. In the Actions tab, check that `notify-grok` ran exactly once for that issue (one run, triggered by the `agent` label).
+4. Check that Grok Bot received one webhook whose payload has `idempotency_key` equal to `<owner>/<repo>#<issue number>`.
+5. If you see two runs or two webhooks for the same issue, the duplicate-webhook fix is missing: compare `notify-grok.yml` with the template.
+
 ---
 
 ## 3. Allow Auto-Merge, Squash Merge & Preserve Branches
