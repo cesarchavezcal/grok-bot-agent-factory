@@ -82,13 +82,19 @@ Inside any working repository derived from this template (or from a template che
 
 | Role | Provider & Model | Pool | Notes |
 | :--- | :--- | :--- | :--- |
-| **Context Scout** | `antigravity::gemini-3.8-flash-high` | `AGY_FAST` | Fast repo scout & context brief (`<2KB`) |
-| **Spec & Plan** | `antigravity::gemini-4-argon-high` | `AGY_PRO` | `wayfinder`, `grill-with-docs`, `to-spec`, `to-tickets` |
-| **Build (UI / CRUD)** | `antigravity::gemini-3.8-flash-high` | `AGY_FAST` | Standard UI, CRUD, frontend, docs slices |
-| **Build (Backend)** | `grok::grok-4.7-build-fast` | `GROK_WORK` | DB, SQL, concurrency, security, state machines |
-| **Runtime Verify** | `antigravity::gemini-3.8-flash-high` | `AGY_FAST` | Drives `.agents/skills/verify-app` (`exitCode: 0`) |
+| **Context Scout** | `antigravity::gemini-3.8-flash-low` | `AGY_FAST` | Fast repo scout & context brief (`<2KB`), low effort |
+| **Spec & Plan** | `antigravity::gemini-3.8-flash-high` | `AGY_FAST` | `wayfinder`, `grill-with-docs`, `to-spec`, `to-tickets`, high effort |
+| **Build (UI / CRUD)** | `antigravity::gemini-3.8-flash-medium` | `AGY_FAST` | Standard UI, CRUD, frontend, docs slices, medium effort |
+| **Build (Backend)** | `grok::grok-4.7-build-fast` | `GROK_WORK` | DB, SQL, concurrency, security, state machines (`reasoningEffort: medium`) |
+| **Runtime Verify** | `antigravity::gemini-3.8-flash-medium` | `AGY_FAST` | Drives `.agents/skills/verify-app` (`exitCode: 0`), medium effort |
 | **Adversarial Audit** | `grok::grok-4.7` (`reasoningEffort: high`) | `GROK_AUDIT` | Independent read-only diff & spec interrogation |
-| **Rework Escalation** | `antigravity::gemini-4-argon-high` | `AGY_PRO` | Up to **2 attempts** (`maxRetries: 2`), distinct from Grok auditor |
+| **Rework Escalation** | `antigravity::gemini-3.8-flash-high` | `AGY_FAST` | Up to **2 attempts** (`maxRetries: 2`), distinct from Grok auditor, high effort |
+
+### Gemini Flash Effort Rule
+Gemini Flash effort is chosen strictly according to task complexity:
+- **`low`** (`gemini-3.8-flash-low`): Scout & simple exploratory tasks (Phase 0 Context Scout).
+- **`medium`** (`gemini-3.8-flash-medium`): Normal work including standard UI/CRUD builds (Phase 3a) and runtime verification (Phase 4a).
+- **`high`** (`gemini-3.8-flash-high`): High-complexity problems including discovery & grilling (Phase 1), spec & ticket breakdown (Phase 2), and rework escalation passes.
 
 ---
 

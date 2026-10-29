@@ -7,7 +7,7 @@
   "builder": "poteto-mode",
   "playbook": "autopilot-full",
   "primarySkill": "poteto-mode",
-  "assignedModel": "antigravity::gemini-3.8-flash-high",
+  "assignedModel": "antigravity::gemini-3.8-flash-medium",
   "planPath": "docs/specs/example-feature.md",
   "ticketIds": ["T-1"],
   "verifySkill": "verify-app",

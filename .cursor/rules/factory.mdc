@@ -35,10 +35,15 @@ This repository follows the **Grok Bot Agent Factory** autonomous workflow. Read
   4. **Squash merge** (`gh pr merge --squash --delete-branch`).
 
 ## 4. Model Routing & Rework Escalation (Zero API Keys, Zero Claude)
-- **Scout & Runtime Verify**: `antigravity::gemini-3.8-flash-high` (`AGY_FAST`).
-- **Spec & Plan**: `antigravity::gemini-4-argon-high` (`AGY_PRO`).
-- **UI / CRUD / Standard Build**: `antigravity::gemini-3.8-flash-high` (`AGY_FAST`).
-- **Backend / Complex Logic Build** (`db`, `sql`, `concurrency`, `security`, `algorithm`, `state-machine`, `architecture`): `grok::grok-4.7-build-fast` (`GROK_WORK`).
+- **Scout**: `antigravity::gemini-3.8-flash-low` (`AGY_FAST`, low effort).
+- **Spec & Plan**: `antigravity::gemini-3.8-flash-high` (`AGY_FAST`, high effort).
+- **UI / CRUD / Standard Build**: `antigravity::gemini-3.8-flash-medium` (`AGY_FAST`, medium effort).
+- **Backend / Complex Logic Build** (`db`, `sql`, `concurrency`, `security`, `algorithm`, `state-machine`, `architecture`): `grok::grok-4.7-build-fast` (`GROK_WORK`, `reasoningEffort: medium`).
+- **Runtime Verify**: `antigravity::gemini-3.8-flash-medium` (`AGY_FAST`, medium effort).
 - **Independent Audit / Interrogation**: `grok::grok-4.7` (`GROK_AUDIT`, `reasoningEffort: "high"`).
-- **Rework Escalation**: On verification or audit failure, escalate rework to **`antigravity::gemini-4-argon-high`** (`AGY_PRO`) — distinct from the `grok-4.7` auditor — for a maximum of **2 attempts** (`maxRetries: 2`). Stop and block if still failing after 2 attempts.
-- **Invariants**: Never use Claude models (`disallowClaude: true`) and never require paid API keys (`strictZeroCost: true`).
+- **Rework Escalation**: On verification or audit failure, escalate rework to **`antigravity::gemini-3.8-flash-high`** (`AGY_FAST`, high effort) — distinct from the `grok-4.7` auditor — for a maximum of **2 attempts** (`maxRetries: 2`). Stop and block if still failing after 2 attempts.
+- **Gemini Flash Effort Rule**: Effort level is chosen strictly by task complexity:
+  - `low` (`gemini-3.8-flash-low`) for scout / simple tasks (`Phase 0 Context Scout`).
+  - `medium` (`gemini-3.8-flash-medium`) for normal work (`Phase 3a UI/CRUD Build`, `Phase 4a Runtime Verification`).
+  - `high` (`gemini-3.8-flash-high`) for plan / spec / hard problems (`Phase 1 Discovery & Grilling`, `Phase 2 Spec & Tickets`, and rework escalation).
+- **Invariants**: Never use Claude models (`disallowClaude: true`), never use Argon models (retired), and never require paid API keys (`strictZeroCost: true`).
