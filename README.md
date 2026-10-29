@@ -54,8 +54,8 @@ Inside any working repository derived from this template (or from a template che
 
 1. **Intake & Dispatch Routing (`agent`, `bug`, `epic` labels)**:
    - Only GitHub Issues or Linear Issues labeled with **`agent`** are ingested. Everything else is ignored.
-   - [`.github/workflows/notify-grok.yml`](.github/workflows/notify-grok.yml) triggers on `issues` (`opened`, `labeled`) and passes the full event payload enriched with explicit top-level `labels` and `delivery_id` to `GROK_WEBHOOK_URL` (with `Authorization: $GROK_WEBHOOK_AUTH`).
-   - **Double-Fire Prevention**: Concurrency with `cancel-in-progress: true` keyed by issue number cancels redundant in-flight runs when issues are created with template labels.
+   - [`.github/workflows/notify-grok.yml`](.github/workflows/notify-grok.yml) triggers on `issues` (`types: [labeled]`) when `github.event.label.name == 'agent'` and passes the full event payload enriched with explicit top-level `labels`, a stable `idempotency_key` (`<repo>#<issue>`), and `delivery_id` to `GROK_WEBHOOK_URL` (with `Authorization: $GROK_WEBHOOK_AUTH`).
+   - **Double-Fire Prevention**: Triggering strictly on `labeled` for `agent` eliminates duplicate webhook runs when issues are created with initial template labels. Concurrency per issue (`cancel-in-progress: false`) ensures reliable sequential delivery.
    - **Skill Routing Matrix & Precedence**:
      - **`epic` + `agent`** -> **[`plan-epic`](.agents/skills/plan-epic/SKILL.md)**: Planning-only flow that decomposes an epic into vertical tracer-bullet sub-issues. Every created sub-issue MUST have `agent`; exactly one final sub-issue receives `deploy`. Label existence is verified before ending. `epic` takes precedence over all other labels.
      - **`bug` + `agent`** -> **[`fix-bug`](.agents/skills/fix-bug/SKILL.md)**: Reproduction-first defect workflow. Reproduces first (if not reproducible, stops and asks in thread final message) -> failing test -> root cause fix (`ce-debug`, `tdd`, `principle-fix-root-causes`) -> verifies all tests + runs app once -> Grok audit -> PR `Closes #N` -> merge on green CI.

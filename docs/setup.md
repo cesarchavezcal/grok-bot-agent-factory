@@ -41,10 +41,11 @@ In Linear (**Workspace Settings → Labels**), create a label named **`agent`** 
 
 ## 2. Grok Bot Webhook Secrets (`GROK_WEBHOOK_URL` & `GROK_WEBHOOK_AUTH`)
 
-`.github/workflows/notify-grok.yml` triggers on `issues` (`opened`, `labeled`) and verifies the presence of the `agent` label:
-- When an issue is **created with labels** (e.g., via the `.github/ISSUE_TEMPLATE/bug.yml` issue form), it dispatches on `opened`. Concurrency with `cancel-in-progress: true` and stable delivery IDs eliminate redundant in-flight runs.
-- When `agent` is **added later to an existing issue**, it dispatches on `labeled`.
-- The webhook payload includes the full event enriched with an explicit top-level `labels` array and a stable `delivery_id`.
+`.github/workflows/notify-grok.yml` triggers on `issues` (`types: [labeled]`) and runs only when `github.event.label.name == 'agent'`:
+- When an issue is **created with labels** (e.g., via the `.github/ISSUE_TEMPLATE/bug.yml` issue form), GitHub emits a `labeled` event for each initial label, so exactly one run dispatches when `agent` is processed.
+- When `agent` is **added later to an existing issue**, GitHub emits a `labeled` event for `agent`.
+- The webhook payload includes the full event enriched with an explicit top-level `labels` array, a stable `idempotency_key` (`<repo>#<issue>`), and `delivery_id`.
+- Concurrency per issue (`cancel-in-progress: false`) ensures events are processed reliably in order.
 
 ### Required Repository Secrets
 - `GROK_WEBHOOK_URL` — Full HTTPS webhook endpoint URL for Grok Bot.
