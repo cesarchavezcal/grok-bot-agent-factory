@@ -24,7 +24,7 @@ cd <name>
 [`./scripts/init.sh`](scripts/init.sh) is 100% idempotent and safe to re-run at any time without duplicate side effects. It:
 1. Verifies required CLI tools (`git`, `gh` authenticated, `node`, `npx`).
 2. Installs/restores all official skills pinned by commit SHA and hash in [`skills-lock.json`](skills-lock.json) into `.agents/skills/`.
-3. Creates/updates GitHub repository labels (including `agent`) via [`./scripts/setup-labels.sh`](scripts/setup-labels.sh).
+3. Creates/updates GitHub repository labels (including `agent` and `epic`) via [`./scripts/setup-labels.sh`](scripts/setup-labels.sh).
 4. Configures GitHub merge policy via `gh api PATCH` (`allow_auto_merge=true`, `allow_squash_merge=true`, `delete_branch_on_merge=true`) and **Branch protection on `main`** via `gh api PUT` with the required status check **`ci`**. If a repository is private on GitHub Free (`403 / upgrade`), it emits a clear, explicit warning instead of failing silently.
 5. Checks `gh secret list` for `GROK_WEBHOOK_URL` and `GROK_WEBHOOK_AUTH`, interactively running `gh secret set` (hidden input) for any missing secret when a TTY is present, or printing a clear reminder without failing if skipped or run non-interactively.
 6. Updates the project slug in [`.factory/config.json`](.factory/config.json) and prints the optional T3 Code project registration command.
@@ -52,9 +52,12 @@ Inside any working repository derived from this template (or from a template che
 
 ## Workflow Overview
 
-1. **Intake (`agent` label only)**:
+1. **Intake (`agent` & `epic` labels)**:
    - Only GitHub Issues or Linear Issues labeled with **`agent`** are ingested. Everything else is ignored.
    - [`.github/workflows/notify-grok.yml`](.github/workflows/notify-grok.yml) triggers on `issues` (`types: [labeled]`) when `github.event.label.name == 'agent'` and `POST`s the GitHub event payload to `GROK_WEBHOOK_URL` (with `Authorization: $GROK_WEBHOOK_AUTH`), exiting `0` with a `::notice::` if either secret is unset.
+   - **Normal vs. Epic Issues**:
+     - **`agent` alone** = normal issue (full plan, build, verify, and merge pipeline).
+     - **`epic` + `agent`** = planning-only thread that splits the work into sub-issues labeled `agent` (`Part of #N`), where the last sub-issue is deploy. **Add `epic` before `agent`** so the `epic` label is already present on the issue payload when adding `agent` triggers `notify-grok.yml`.
 2. **Planning (`mattpocock/skills`)**:
    - Uses the full official skills installed from `mattpocock/skills` and locked in [`skills-lock.json`](skills-lock.json):
      - [`wayfinder`](.agents/skills/wayfinder/SKILL.md)

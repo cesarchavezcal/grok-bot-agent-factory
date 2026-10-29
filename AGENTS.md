@@ -25,7 +25,7 @@ What [`./scripts/init.sh`](scripts/init.sh) does (idempotent, safe to re-run at 
    - From `mattpocock/skills`: [`wayfinder`](.agents/skills/wayfinder/SKILL.md), [`grill-with-docs`](.agents/skills/grill-with-docs/SKILL.md) (full standalone skill with `ADR-FORMAT.md` & `CONTEXT-FORMAT.md`), [`grilling`](.agents/skills/grilling/SKILL.md), [`domain-modeling`](.agents/skills/domain-modeling/SKILL.md), [`to-spec`](.agents/skills/to-spec/SKILL.md), [`to-tickets`](.agents/skills/to-tickets/SKILL.md), and [`tdd`](.agents/skills/tdd/SKILL.md) (with `tests.md` & `mocking.md`).
    - From `cursor/plugins` (`pstack`): [`poteto-mode`](.agents/skills/poteto-mode/SKILL.md) (including `playbooks/autopilot-full.md`).
    - Checks local [`.agents/skills/verify-app/SKILL.md`](.agents/skills/verify-app/SKILL.md).
-3. **GitHub Labels**: Runs [`./scripts/setup-labels.sh`](scripts/setup-labels.sh) to ensure the `agent` trigger label and workflow state labels exist (and prints the Linear `agent` label note).
+3. **GitHub Labels**: Runs [`./scripts/setup-labels.sh`](scripts/setup-labels.sh) to ensure the `agent` trigger label, `epic` planning label, and workflow state labels exist (and prints the Linear `agent` label note).
 4. **Merge Policy & Branch Protection (`gh api`)**:
    - Calls `gh api PATCH repos/<owner>/<repo>` to enable `allow_auto_merge=true`, `allow_squash_merge=true`, `allow_merge_commit=false`, `allow_rebase_merge=false`, and `delete_branch_on_merge=true`.
    - Calls `gh api PUT repos/<owner>/<repo>/branches/main/protection` to protect `main` with the required status check **`ci`** (`strict: true`), linear history, and conversation resolution.
@@ -34,10 +34,14 @@ What [`./scripts/init.sh`](scripts/init.sh) does (idempotent, safe to re-run at 
 
 ---
 
-## 1. Intake Rule (`agent` Label Gate)
+## 1. Intake Rule (`agent` & `epic` Label Gate)
 
 - **Entry Condition**: Only issues from **GitHub Issues** or **Linear** carrying the **`agent`** label are eligible for execution.
 - **Ignore Rule**: Any issue without the `agent` label MUST be ignored completely.
+- **Normal vs. Epic Flow**:
+  - **`agent` alone**: Normal issue — executes the standard plan, build, verify, and merge pipeline.
+  - **`epic` + `agent`**: Planning-only thread that splits the epic into sub-issues labeled `agent` (`Part of #N`), where the last sub-issue is deploy. Do not write or merge implementation code directly on the epic thread.
+  - **Labeling Order**: Always add **`epic` before `agent`** so the `epic` label is already present on the issue when adding `agent` triggers `.github/workflows/notify-grok.yml`.
 - **Work-Item State**: Each accepted issue is tracked in `.factory/work-items/<id>.json` following [`.factory/work-item.schema.json`](.factory/work-item.schema.json). Do not commit runtime work-item JSON files unless explicitly asked.
 
 ---
