@@ -9,10 +9,12 @@ This repository follows the **Grok Bot Agent Factory** autonomous workflow. Read
 
 ## 0. Working Repository Creation & Bootstrap (`template init`)
 - New working repositories created from this template MUST be created as **PUBLIC** (`gh repo create <name> --public --template cesarchavezcal/grok-bot-agent-factory --clone`) so GitHub Free allows branch protection (`ci` required check) and auto-merge (`allow_auto_merge`).
-- Run `./scripts/init.sh` (idempotent) to install/verify locked skills, create labels (`agent`, etc.), enable squash + auto-merge, and protect `main`.
+- Run `./scripts/init.sh` (idempotent) to install/verify locked skills, create labels (`agent`, `epic`, etc.), enable squash + auto-merge, and protect `main`.
 
-## 1. Intake Gate (`agent` Label Only)
+## 1. Intake Gate (`agent` & `epic` Labels)
 - Process **only** GitHub Issues or Linear Issues carrying the `agent` label. Ignore all other issues.
+- **`agent` alone** = normal issue (full plan, build, verify, and merge pipeline).
+- **`epic` + `agent`** = planning-only thread that creates sub-issues labeled `agent` (`Part of #N`), where the last one is deploy. Always add `epic` before `agent`.
 - Track active work in `.factory/work-items/<id>.json` (conforming to `.factory/work-item.schema.json`). Do not commit runtime work-item instances unless requested.
 
 ## 2. Planning & Grilling (Official `mattpocock/skills`)

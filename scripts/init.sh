@@ -88,7 +88,7 @@ else
 fi
 
 # ------------------------------------------------------------------------------
-# 3. Sync GitHub labels (including `agent`)
+# 3. Sync GitHub labels (including `agent` and `epic`)
 # ------------------------------------------------------------------------------
 echo ""
 echo "🏷️  [3/6] Configuring GitHub labels..."

@@ -24,21 +24,27 @@ Or if initializing from an existing local directory without a remote yet:
 
 ---
 
-## 1. Labels (`agent` Intake Gate)
+## 1. Labels (`agent` & `epic` Intake Gate)
 
 Only issues carrying the **`agent`** label are processed by the factory. All unlabeled issues (or issues without `agent`) are ignored.
 
 ### GitHub
-Run the idempotent label script:
+Run the idempotent label script (also executed automatically by `./scripts/init.sh`):
 
 ```bash
 ./scripts/setup-labels.sh
 ```
 
 This creates/updates:
-- `agent` (`#0E8A16`) — Trigger for Grok Bot / Agent Factory intake.
+- `agent` (`#0E8A16`) — Trigger: issue is picked up by the autonomous agent factory (Grok Bot).
+- `epic` (`#B60205`) — Planning only: split into agent sub-issues.
 - `waiting-for-human` (`#FBCA04`) — Set when the agent posts a numbered block of 2–3 grilling questions and stops.
 - `in-progress` (`#1D76DB`), `rework` (`#D93F0B`), `ready-to-merge` (`#5319E7`), `feature` (`#A2EEEF`), `bug` (`#D73A4A`).
+
+### Issue Modes (`epic` + `agent` vs. `agent` alone)
+- **`agent` alone**: Treated as a normal issue (executes the standard plan, build, verify, and merge pipeline).
+- **`epic` + `agent`**: Runs as a planning-only thread that creates sub-issues labeled `agent` (referencing `"Part of #N"`), where the last sub-issue is deploy.
+- **Labeling order (`epic` before `agent`)**: Because `.github/workflows/notify-grok.yml` triggers when the `agent` label is added, **always add `epic` before `agent`** so `epic` is already present in the webhook payload when `agent` dispatches the issue.
 
 ### Linear
 In Linear (**Workspace Settings → Labels**), create a label named **`agent`** (exact lowercase). Only Linear issues tagged with `agent` are dispatched.
