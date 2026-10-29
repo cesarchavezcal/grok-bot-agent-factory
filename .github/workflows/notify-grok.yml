@@ -6,7 +6,7 @@ on:
 
 concurrency:
   group: notify-grok-${{ github.event.issue.number }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -15,9 +15,12 @@ permissions:
 jobs:
   notify-grok:
     name: notify-grok
+    # Run when:
+    # 1. Issue is opened with the 'agent' label already applied (e.g. via issue templates or API)
+    # 2. Issue has the 'agent' label added
     if: >-
       (github.event.action == 'opened' && contains(github.event.issue.labels.*.name, 'agent')) ||
-      (github.event.action == 'labeled' && github.event.label.name == 'agent' && github.event.issue.created_at != github.event.issue.updated_at)
+      (github.event.action == 'labeled' && github.event.label.name == 'agent')
     runs-on: ubuntu-latest
     steps:
       - name: Send issue event to Grok Bot webhook
@@ -29,7 +32,10 @@ jobs:
             echo "::notice::Skipping Grok webhook notification: GROK_WEBHOOK_URL or GROK_WEBHOOK_AUTH secret is not set."
             exit 0
           fi
-          jq '.labels = [(.issue.labels // [])[].name]' "$GITHUB_EVENT_PATH" | curl -fsS -X POST "$URL" \
+          jq --arg run_id "$GITHUB_RUN_ID" \
+             --arg delivery_id "${{ github.event.issue.number }}" \
+             '.delivery_id = $delivery_id | .run_id = $run_id | .labels = [(.issue.labels // [])[].name]' \
+             "$GITHUB_EVENT_PATH" | curl -fsS -X POST "$URL" \
             -H "Authorization: $AUTH" \
             -H "Content-Type: application/json" \
             --data-binary @-

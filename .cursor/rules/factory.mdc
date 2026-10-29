@@ -13,10 +13,14 @@ This repository follows the **Grok Bot Agent Factory** autonomous workflow. Read
 
 ## 1. Intake Gate & Skill Routing (`agent`, `bug`, `epic` Labels)
 - Process **only** GitHub Issues or Linear Issues carrying the `agent` label. Ignore all other issues.
-- **Routing Matrix**:
+- **Routing Matrix & Precedence**:
   - **`epic` + `agent`** -> **`plan-epic`**: Planning-only thread that decomposes an epic into vertical sub-issues (`Part of #N`). Every created sub-issue MUST get the `agent` label; exactly one final sub-issue gets the `deploy` label. Verify all sub-issues have `agent` before ending.
-  - **`bug` + `agent`** -> **`fix-bug`**: Read issue/error/logs -> reproduce first (if it cannot reproduce, stop and ask) -> write a failing test -> fix the root cause (`ce-debug`, `tdd`, `principle-fix-root-causes`) -> verify all tests + run the app once -> Grok audit -> PR `Closes #N` -> squash merge on green.
-  - **`agent` alone (or with `feature`)** -> **`implement-ticket`**: Full lifecycle: plan (`grill-with-docs` + `wayfinder`) -> build (`poteto-mode` reproduce, test, fix, verify) -> Grok audit -> rework rule -> PR `Closes #N` -> squash merge on green CI. Deploy only on the last sub-issue of an epic (with `deploy` label), after its green merge.
+    - *Precedence*: `epic` takes priority over all other labels. If an issue carries `epic` + `bug` + `agent`, it routes to `plan-epic`.
+  - **`bug` + `agent`** -> **`fix-bug`**: Read issue/error/logs -> reproduce first (if it cannot reproduce, stop and ask César in thread final message) -> write a failing test -> fix the root cause (`ce-debug`, `tdd`, `principle-fix-root-causes`) -> verify all tests + run the app once -> Grok audit -> PR `Closes #N` -> squash merge on green.
+  - **`agent` alone (or with `feature`)** -> **`implement-ticket`**: Full lifecycle: plan (`grill-with-docs` + `wayfinder`) -> build (`poteto-mode` reproduce, test, fix, verify) -> Grok audit -> rework rule -> PR `Closes #N` -> squash merge on green CI.
+- **Deploy Rule**:
+  - Deploy only on the last sub-issue of an epic (carrying the `deploy` label), after its green merge.
+  - Intermediate sub-issues never deploy.
 - **Issue Closing**: Every PR body MUST include `Closes #N` (never `Refs #N`) so the issue closes when the PR merges; for epics, the final deploy sub-issue PR also includes `Closes #EPIC`. Agents never close issues by hand.
 - Track active work in `.factory/work-items/<id>.json` (conforming to `.factory/work-item.schema.json`). Do not commit runtime work-item instances unless requested.
 

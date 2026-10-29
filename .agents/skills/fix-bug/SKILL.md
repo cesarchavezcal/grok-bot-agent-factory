@@ -26,13 +26,16 @@ High-level bug fixing skill for autonomous defect triage, reproduction-first dia
 6. Independent Audit (Grok 4.7 High: GROK_AUDIT)
      ↓ (If audit fails: rework with Gemini 3.8 Flash High, max 2 retries)
 7. PR & Squash Merge (Closes #N; green CI 'ci' + audit PASS; gh pr merge --squash without --delete-branch)
+     ↓
+8. Deploy Check (Deploy only if issue carries 'deploy' label, after green merge)
 ```
 
 ---
 
 ## Phase 1: Intake & Triage
 
-- **Trigger**: Issue carries labels `bug` + `agent`.
+- **Trigger**: Issue carries labels `bug` + `agent` (and does NOT carry `epic`).
+  - *Precedence Rule*: If an issue carries `epic` + `bug` + `agent`, **`plan-epic` takes precedence**.
 - Extract structured inputs from the bug issue form:
   - **What happened** (unexpected behavior or crash symptom)
   - **Expected behavior** (desired correct state)
@@ -105,7 +108,7 @@ Enforce root-cause engineering discipline directly in the fix:
 2. **Rework Rule**:
    - If audit fails, rework is assigned to **`antigravity::gemini-3.8-flash-high`** (effort: high).
    - Rework builder is strictly from a different model family from the Grok auditor.
-   - Maximum 2 rework attempts (`maxRetries: 2`).
+   - **Max Retries**: Exactly **2 rework attempts** (`maxRetries: 2`). If still unresolved after 2 attempts, stop immediately and report the blocker in the thread final message.
 
 ---
 
@@ -114,7 +117,7 @@ Enforce root-cause engineering discipline directly in the fix:
 1. **Branch & PR**:
    - Create branch: `fix/<issue-number>-<short-description>`.
    - Commit as `cesarchavezcal` (`cesarchavezcal@gmail.com`).
-   - PR body MUST include `Closes #N` so GitHub automatically closes the bug report upon merge.
+   - PR body MUST include `Closes #N` so GitHub automatically closes the bug report upon merge. If the bug is the final deploy sub-issue of an epic, also include `Closes #<EPIC_NUMBER>`.
    - Include root-cause explanation, reproduction evidence, and test diff in the PR description.
 2. **Squash Merge**:
    - Merge ONLY when required status check **`ci`** is green and Grok audit returns `PASS`.
@@ -123,3 +126,11 @@ Enforce root-cause engineering discipline directly in the fix:
      gh pr merge <PR_NUMBER> --squash
      ```
    - **Strict Rule**: NEVER pass `--delete-branch`. Never delete branches.
+
+---
+
+## Phase 8: Deploy Check
+
+- Inspect issue labels for **`deploy`**:
+  - If `deploy` is present: this bug was the designated final sub-issue of an epic. Execute deployment hook (or report deploy completed) after green squash merge.
+  - If `deploy` is absent: **no deploy**. Complete the ticket without deploying.

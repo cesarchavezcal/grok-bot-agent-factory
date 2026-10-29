@@ -44,7 +44,7 @@ Inside any working repository derived from this template (or from a template che
 
 - **First-Time Sync Ready**: If the target repo does not yet have `.factory/template-sync.json`, the script fetches the manifest from the template ref via `gh` auth, uses it to drive the sync, and includes `.factory/template-sync.json` in the synced files.
 - **Remote Target (`--target <path>`)**: Can be run from a template checkout against another local repo; both the dirty-tree guard and the template self-guard apply to the target repo rather than the script location.
-- **Explicit Manifest ([`.factory/template-sync.json`](.factory/template-sync.json))**: Syncs only managed factory paths (`.factory/template-sync.json`, `.github/workflows/*`, `scripts/*`, `.agents/skills/*`, `.cursor/rules`, `.cursor/agents`, `AGENTS.md`, `skills-lock.json`, `.factory/work-item.schema.json`, `.factory/WORK-ITEM.example.json`) and never touches application code or `.factory/config.json`.
+- **Explicit Manifest ([`.factory/template-sync.json`](.factory/template-sync.json))**: Syncs only managed factory paths (`.factory/template-sync.json`, `.github/workflows/*`, `.github/ISSUE_TEMPLATE/*`, `scripts/*`, `.agents/skills/*`, `.cursor/rules`, `.cursor/agents`, `AGENTS.md`, `skills-lock.json`, `.factory/work-item.schema.json`, `.factory/WORK-ITEM.example.json`) and never touches application code or `.factory/config.json`.
 - **Idempotent**: Prints a diff summary and creates no branch or PR when nothing changed.
 - **Version Tracking ([`.factory/template-version`](.factory/template-version))**: Records the synced 40-character template commit SHA.
 
@@ -54,10 +54,10 @@ Inside any working repository derived from this template (or from a template che
 
 1. **Intake & Dispatch Routing (`agent`, `bug`, `epic` labels)**:
    - Only GitHub Issues or Linear Issues labeled with **`agent`** are ingested. Everything else is ignored.
-   - [`.github/workflows/notify-grok.yml`](.github/workflows/notify-grok.yml) triggers on `issues` (`opened`, `labeled`) and passes the full event payload enriched with explicit top-level `labels` to `GROK_WEBHOOK_URL` (with `Authorization: $GROK_WEBHOOK_AUTH`).
-   - **Double-Fire Prevention**: Checks `created_at != updated_at` on `labeled` events so issues created with template labels only fire once on `opened`.
-   - **Skill Routing Matrix**:
-     - **`epic` + `agent`** -> **[`plan-epic`](.agents/skills/plan-epic/SKILL.md)**: Planning-only flow that decomposes an epic into vertical tracer-bullet sub-issues. Every created sub-issue MUST have `agent`; exactly one final sub-issue receives `deploy`. Label existence is verified before ending.
+   - [`.github/workflows/notify-grok.yml`](.github/workflows/notify-grok.yml) triggers on `issues` (`opened`, `labeled`) and passes the full event payload enriched with explicit top-level `labels` and `delivery_id` to `GROK_WEBHOOK_URL` (with `Authorization: $GROK_WEBHOOK_AUTH`).
+   - **Double-Fire Prevention**: Concurrency with `cancel-in-progress: true` keyed by issue number cancels redundant in-flight runs when issues are created with template labels.
+   - **Skill Routing Matrix & Precedence**:
+     - **`epic` + `agent`** -> **[`plan-epic`](.agents/skills/plan-epic/SKILL.md)**: Planning-only flow that decomposes an epic into vertical tracer-bullet sub-issues. Every created sub-issue MUST have `agent`; exactly one final sub-issue receives `deploy`. Label existence is verified before ending. `epic` takes precedence over all other labels.
      - **`bug` + `agent`** -> **[`fix-bug`](.agents/skills/fix-bug/SKILL.md)**: Reproduction-first defect workflow. Reproduces first (if not reproducible, stops and asks in thread final message) -> failing test -> root cause fix (`ce-debug`, `tdd`, `principle-fix-root-causes`) -> verifies all tests + runs app once -> Grok audit -> PR `Closes #N` -> merge on green CI.
      - **`agent` alone (or with `feature`)** -> **[`implement-ticket`](.agents/skills/implement-ticket/SKILL.md)**: Standard feature pipeline orchestrating plan (`wayfinder` + `grill-with-docs`) -> build (`poteto-mode`) -> Grok audit -> rework -> PR `Closes #N` -> squash merge on green CI. Deploys only if the issue carries the `deploy` label.
 2. **Communication Discipline**:

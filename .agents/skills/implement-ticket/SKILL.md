@@ -32,6 +32,7 @@ High-level orchestrator skill designed for autonomous feature tickets and issue-
 ## Phase 1: Intake & Context Scout
 
 - **Trigger**: Issue carries the `agent` label (and does not carry `bug` or `epic`).
+  - *Precedence Rule*: `epic` takes highest precedence (routes to `plan-epic`), followed by `bug` (routes to `fix-bug`).
 - **Scout Model**: `antigravity::gemini-3.8-flash-low` (`effort: low`).
 - Parse issue number `#N`, title, description, and attached labels.
 - Perform targeted read-only reconnaissance across the codebase.
@@ -94,7 +95,7 @@ High-level orchestrator skill designed for autonomous feature tickets and issue-
    - Create a feature branch off `main`: `feat/<work-item-id>`.
    - Commit changes as `cesarchavezcal` (`cesarchavezcal@gmail.com`).
    - Open a PR targeting `main`.
-   - **Issue Link Invariant**: PR body MUST include `Closes #N` so GitHub automatically closes the issue upon merge. If part of an epic final deploy ticket, also include `Closes #<EPIC_ID>`.
+   - **Issue Link Invariant**: PR body MUST include `Closes #N` so GitHub automatically closes the issue upon merge. If this issue carries the `deploy` label as the final sub-issue of an epic, the PR body MUST ALSO include `Closes #<EPIC_NUMBER>`.
 2. **Merge Gate**:
    - Merge ONLY when:
      - Required status check **`ci`** is green on the current head rebased onto `main`.
@@ -117,4 +118,3 @@ High-level orchestrator skill designed for autonomous feature tickets and issue-
     - Execute deployment steps ONLY AFTER the PR has cleanly merged to `main` with green CI.
   - If the issue does NOT carry the `deploy` label:
     - **No deploy**. Complete the ticket without deploying.
-- *(Note: During template development or when deploy is globally disabled, skip execution of deploy steps.)*

@@ -20,14 +20,16 @@ Run the idempotent label script (also executed automatically by `./scripts/init.
 This creates/updates:
 - `agent` (`#0E8A16`) — Trigger: issue is picked up by the autonomous agent factory (Grok Bot).
 - `epic` (`#B60205`) — Planning only: split into agent sub-issues.
-- `deploy` (`#006B75`) — Deploy trigger: applied to the final sub-issue of an epic after green merge.
+- `deploy` (`#006B75`) — Deploy trigger: applied to the final sub-issue of an epic at creation; triggers deploy after green merge.
 - `waiting-for-human` (`#FBCA04`) — Blocked on questions awaiting human response via Grok Bot.
 - `in-progress` (`#1D76DB`), `rework` (`#D93F0B`), `ready-to-merge` (`#5319E7`), `feature` (`#A2EEEF`), `bug` (`#D73A4A`).
 
-### Skill Routing Matrix
+### Skill Routing Matrix & Priority
 - **`epic` + `agent`** -> **`plan-epic`**: Planning-only thread that decomposes an epic into vertical sub-issues (`Part of #N`). Every created sub-issue MUST get the `agent` label; exactly one final sub-issue receives the `deploy` label. Label existence is verified before completion.
+  - *Precedence*: `epic` takes priority over all other labels. If an issue has `epic` + `bug` + `agent`, it routes to `plan-epic`.
 - **`bug` + `agent`** -> **`fix-bug`**: Reproduction-first defect workflow. Reproduces first (if unable to reproduce, stops and asks César in thread final message) -> writes failing test -> fixes root cause (`ce-debug`, `tdd`, `principle-fix-root-causes`) -> verifies all tests + runs app once -> Grok audit -> PR `Closes #N` -> merge on green CI.
-- **`agent` alone (or with `feature`)** -> **`implement-ticket`**: Full lifecycle: plan (`grill-with-docs` + `wayfinder`) -> build (`poteto-mode`) -> Grok audit -> rework rule -> PR `Closes #N` -> merge on green CI. Deploys only if the issue has the `deploy` label.
+- **`agent` alone (or with `feature`)** -> **`implement-ticket`**: Full lifecycle: plan (`grill-with-docs` + `wayfinder`) -> build (`poteto-mode`) -> Grok audit -> rework rule -> PR `Closes #N` -> merge on green CI.
+- **Manual Labeling Order (`epic` before `agent`)**: When manually labeling an existing issue in GitHub or Linear, **always add `epic` before `agent`** so `epic` is already present on the issue payload when `agent` triggers `notify-grok.yml`.
 - **Deploy Rule**: Intermediate sub-issues never deploy. Deploy occurs only on the final sub-issue of an epic (carrying the `deploy` label), after its green merge.
 - **Issue Closing Rule**: Every PR body uses `Closes #N` (never `Refs #N`). For epics, the final deploy sub-issue PR also includes `Closes #EPIC`. Agents never close issues by hand.
 - **Communication Rule**: Never comment on issues or PRs. When questions or reproduction blockers arise, stop and write them in the thread final message for dispatcher relay.
@@ -40,9 +42,9 @@ In Linear (**Workspace Settings → Labels**), create a label named **`agent`** 
 ## 2. Grok Bot Webhook Secrets (`GROK_WEBHOOK_URL` & `GROK_WEBHOOK_AUTH`)
 
 `.github/workflows/notify-grok.yml` triggers on `issues` (`opened`, `labeled`) and verifies the presence of the `agent` label:
-- When an issue is **created with labels** (e.g., via the `.github/ISSUE_TEMPLATE/bug.yml` issue form), it dispatches immediately on `opened`. The subsequent initial `labeled` event is ignored via `created_at != updated_at` comparison to prevent double-firing.
+- When an issue is **created with labels** (e.g., via the `.github/ISSUE_TEMPLATE/bug.yml` issue form), it dispatches on `opened`. Concurrency with `cancel-in-progress: true` and stable delivery IDs eliminate redundant in-flight runs.
 - When `agent` is **added later to an existing issue**, it dispatches on `labeled`.
-- The webhook payload includes the full event enriched with an explicit top-level `labels` array.
+- The webhook payload includes the full event enriched with an explicit top-level `labels` array and a stable `delivery_id`.
 
 ### Required Repository Secrets
 - `GROK_WEBHOOK_URL` — Full HTTPS webhook endpoint URL for Grok Bot.
@@ -142,11 +144,12 @@ Derived working repositories can pull factory infrastructure updates from the pr
 ### How It Works
 1. **Authenticated Private Fetch**: Uses `gh repo clone` (`gh` CLI authentication) to fetch `cesarchavezcal/grok-bot-agent-factory` into a temporary directory.
 2. **First-Time Bootstrap & `--target <path>`**:
-   - If the target repository does not yet have `.factory/template-sync.json`, `sync-template.sh` fetches `.factory/template-sync.json` from the template ref via `gh` auth, uses it to drive the sync, and includes `.factory/template-sync.json` in the synced files.
+   - If the target repository does not yet have `.factory/template-sync.json` (for example, an older derived repo or an existing project adopting the factory), `sync-template.sh` fetches `.factory/template-sync.json` from the template ref via `gh` auth, uses it to drive the sync, and includes `.factory/template-sync.json` in the synced files.
    - Pass `--target <path>` to run `scripts/sync-template.sh` directly from a template checkout against any target repository; both the clean working-tree guard and the template self-guard evaluate the **target** repository rather than the script's location.
 3. **Explicit Manifest (`.factory/template-sync.json`)**: Copies only the managed paths declared in `.factory/template-sync.json`:
    - `.factory/template-sync.json`
    - `.github/workflows/*`
+   - `.github/ISSUE_TEMPLATE/*`
    - `scripts/*` (including `scripts/sync-template.sh`, `scripts/init.sh`, and `scripts/setup-labels.sh`)
    - `.agents/skills/*`
    - `.cursor/rules`
@@ -156,3 +159,5 @@ Derived working repositories can pull factory infrastructure updates from the pr
    - `.factory/work-item.schema.json`
    - `.factory/WORK-ITEM.example.json`
 4. **Never Touches App Code**: Application source files, `.factory/config.json` (which stores the working repo's `app` slug and `verifySkill`), `.factory/work-items`, and `.agents/skills/verify-app/features` are preserved.
+5. **Idempotent**: If no managed files changed, it prints an up-to-date message and exits `0` without creating a branch or opening a PR.
+6. **Version Tracking (`.factory/template-version`)**: When managed files change, it records the synced 40-character template commit SHA in `.factory/template-version`, prints a diff summary, pushes `chore/template-sync-<short-sha>`, and opens (or updates) a Pull Request against `main`.

@@ -21,11 +21,7 @@ cd <name>
 
 What [`./scripts/init.sh`](scripts/init.sh) does (idempotent, safe to re-run at any time):
 1. **Tool & Auth Verification**: Verifies `git`, `gh` (authenticated), `node`, and `npx` with clear diagnostic messages.
-2. **Official Skills Sync**: Installs/restores the full official skills pinned by commit SHA and hash in [`skills-lock.json`](skills-lock.json):
-   - From `mattpocock/skills`: [`wayfinder`](.agents/skills/wayfinder/SKILL.md), [`grill-with-docs`](.agents/skills/grill-with-docs/SKILL.md) (full standalone skill with `ADR-FORMAT.md` & `CONTEXT-FORMAT.md`), [`grilling`](.agents/skills/grilling/SKILL.md), [`domain-modeling`](.agents/skills/domain-modeling/SKILL.md), [`to-spec`](.agents/skills/to-spec/SKILL.md), [`to-tickets`](.agents/skills/to-tickets/SKILL.md), and [`tdd`](.agents/skills/tdd/SKILL.md) (with `tests.md` & `mocking.md`).
-   - From `cursor/plugins` (`pstack`): [`poteto-mode`](.agents/skills/poteto-mode/SKILL.md) (including `playbooks/autopilot-full.md`).
-   - Factory orchestrators: [`implement-ticket`](.agents/skills/implement-ticket/SKILL.md), [`fix-bug`](.agents/skills/fix-bug/SKILL.md), [`plan-epic`](.agents/skills/plan-epic/SKILL.md).
-   - Checks local [`.agents/skills/verify-app/SKILL.md`](.agents/skills/verify-app/SKILL.md).
+2. **Official Skills Sync**: Installs/restores official upstream skills pinned by commit SHA and hash in [`skills-lock.json`](skills-lock.json) (`wayfinder`, `grill-with-docs`, `grilling`, `domain-modeling`, `to-spec`, `to-tickets`, `tdd`, `poteto-mode`), and verifies repository orchestrators ([`implement-ticket`](.agents/skills/implement-ticket/SKILL.md), [`fix-bug`](.agents/skills/fix-bug/SKILL.md), [`plan-epic`](.agents/skills/plan-epic/SKILL.md), and [`.agents/skills/verify-app/SKILL.md`](.agents/skills/verify-app/SKILL.md)).
 3. **GitHub Labels**: Runs [`./scripts/setup-labels.sh`](scripts/setup-labels.sh) to ensure `agent`, `epic`, `deploy`, `bug`, and workflow state labels exist.
 4. **Merge Policy & Branch Protection (`gh api`)**:
    - Calls `gh api PATCH repos/<owner>/<repo>` to enable `allow_auto_merge=true`, `allow_squash_merge=true`, `allow_merge_commit=false`, `allow_rebase_merge=false`, and `delete_branch_on_merge=false` (branches are preserved).
@@ -39,8 +35,9 @@ What [`./scripts/init.sh`](scripts/init.sh) does (idempotent, safe to re-run at 
 
 - **Entry Condition**: Only issues from **GitHub Issues** or **Linear** carrying the **`agent`** label are eligible for execution.
 - **Ignore Rule**: Any issue without the `agent` label MUST be ignored completely.
-- **Routing Matrix**:
+- **Routing Matrix & Precedence**:
   - **`epic` + `agent`** -> **[`plan-epic`](.agents/skills/plan-epic/SKILL.md)**: Planning-only thread that splits an epic into vertical sub-issues (`Part of #N`). Every created sub-issue MUST receive the `agent` label; exactly one final sub-issue receives the `deploy` label. Verify all sub-issues have `agent` before completing.
+    - *Precedence*: `epic` takes priority over all other labels. If an issue carries `epic` + `bug` + `agent`, it routes to `plan-epic`.
   - **`bug` + `agent`** -> **[`fix-bug`](.agents/skills/fix-bug/SKILL.md)**: Reads issue/error/logs -> reproduces first (if it cannot reproduce, stop and ask César in thread final message) -> writes failing test -> fixes root cause (`ce-debug`, `tdd`, `principle-fix-root-causes`) -> verifies all tests + runs the app once -> Grok audit -> PR `Closes #N` -> squash merge on green CI.
   - **`agent` alone (or with `feature`)** -> **[`implement-ticket`](.agents/skills/implement-ticket/SKILL.md)**: Full lifecycle feature delivery: plan (`grill-with-docs` + `wayfinder`) -> build (`poteto-mode` reproduce, test, fix, verify) -> Grok audit -> rework rule -> PR `Closes #N` -> squash merge on green CI.
 - **Deploy Rule**:
@@ -55,7 +52,8 @@ What [`./scripts/init.sh`](scripts/init.sh) does (idempotent, safe to re-run at 
 
 ## 2. Pipeline Stages & Skills
 
-| Stage | Primary Skill(s) | Active Model (`provider::model`) | Pool |\n| :--- | :--- | :--- | :--- |
+| Stage | Primary Skill(s) | Active Model (`provider::model`) | Pool |
+| :--- | :--- | :--- | :--- |
 | **Phase 0: Context Scout** | Repo exploration & context brief (`<2KB`) | `antigravity::gemini-3.8-flash-low` | `AGY_FAST` |
 | **Phase 1: Discovery & Grilling** | [`wayfinder`](.agents/skills/wayfinder/SKILL.md), [`grill-with-docs`](.agents/skills/grill-with-docs/SKILL.md), [`grilling`](.agents/skills/grilling/SKILL.md), [`domain-modeling`](.agents/skills/domain-modeling/SKILL.md) | `antigravity::gemini-3.8-flash-high` | `AGY_FAST` |
 | **Phase 2: Spec & Tickets** | [`to-spec`](.agents/skills/to-spec/SKILL.md), [`to-tickets`](.agents/skills/to-tickets/SKILL.md), [`plan-epic`](.agents/skills/plan-epic/SKILL.md) | `antigravity::gemini-3.8-flash-high` | `AGY_FAST` |
@@ -68,7 +66,7 @@ What [`./scripts/init.sh`](scripts/init.sh) does (idempotent, safe to re-run at 
 ### Strict Invariants
 - **Zero Paid API Keys**: Never require or read `GEMINI_API_KEY`, `XAI_API_KEY`, `CURSOR_API_KEY`, `ANTHROPIC_API_KEY`, or `OPENAI_API_KEY`. All models run through authenticated sessions.
 - **100% Claude & GPT Free**: Never route tasks to Claude or GPT models (`disallowClaude: true`).
-- **Zero Argon Usage**: Argon models are completely retired across all orchestration (`forbidArgon: true`).
+- **Zero Argon Usage**: Argon models are completely retired across all orchestration.
 - **Model Separation on Audit & Rework**: Rework escalates to `antigravity::gemini-3.8-flash-high` (up to 2 attempts) so the rework builder is always a different model family from the `grok::grok-4.7` auditor.
 - **Task-Based Effort Scaling**:
   - `low` (`gemini-3.8-flash-low`) for scout & simple tasks.

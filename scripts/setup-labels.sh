@@ -31,7 +31,7 @@ create_label() {
 
 create_label "agent"             "0E8A16" "Trigger: issue is picked up by the autonomous agent factory (Grok Bot)"
 create_label "epic"              "B60205" "Planning only: split into agent sub-issues"
-create_label "deploy"            "006B75" "Deploy trigger: applied to the final sub-issue of an epic after green merge"
+create_label "deploy"            "006B75" "Deploy trigger: applied to the final sub-issue of an epic at creation; triggers deploy after green merge"
 create_label "waiting-for-human" "FBCA04" "Blocked on questions awaiting human response via Grok Bot"
 create_label "in-progress"       "1D76DB" "Currently being planned, built, or verified by an agent worktree"
 create_label "rework"            "D93F0B" "Escalated to Gemini 3.8 Flash High for rework after verification/interrogation failure"
