@@ -129,8 +129,12 @@ Enforce root-cause engineering discipline directly in the fix:
 
 ---
 
-## Phase 8: Deploy Check
+## Phase 8: Epic Sub-Issue Deploy Rule
 
-- Inspect issue labels for **`deploy`**:
-  - If `deploy` is present: this bug was the designated final sub-issue of an epic. Execute deployment hook (or report deploy completed) after green squash merge.
-  - If `deploy` is absent: **no deploy**. Complete the ticket without deploying.
+- **Deploy Check**:
+  - Inspect the issue labels for the **`deploy`** label.
+  - If the issue carries the **`deploy`** label:
+    - This is the designated final sub-issue of an epic.
+    - Execute deployment steps ONLY AFTER the PR has cleanly merged to `main` with green CI.
+  - If the issue does NOT carry the `deploy` label:
+    - **No deploy**. Complete the ticket without deploying.

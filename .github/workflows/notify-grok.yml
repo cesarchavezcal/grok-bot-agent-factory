@@ -1,4 +1,5 @@
 name: Notify Grok Bot
+run-name: "notify-grok #${{ github.event.issue.number }} (${{ github.event.action }})"
 
 on:
   issues:
@@ -32,27 +33,25 @@ jobs:
           RUN_ID: ${{ github.run_id }}
         run: |
           if [ "$ACTION" = "labeled" ]; then
-            # If this issue was opened with 'agent', an 'opened' run was already dispatched for it.
-            # Query recent workflow runs for this issue to detect if 'opened' already processed it.
-            PREV_OPENED_RUN=$(gh run list \
-              --workflow=notify-grok.yml \
-              --event=issues \
-              --json databaseId,conclusion,status \
-              -q ".[] | select(.databaseId != $RUN_ID and (.conclusion == \"success\" or .status == \"in_progress\")) | .databaseId" \
-              2>/dev/null | head -n 1 || true)
+            CREATED_AT="${{ github.event.issue.created_at }}"
+            CREATED_EPOCH=$(date -d "$CREATED_AT" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$CREATED_AT" +%s 2>/dev/null || echo 0)
+            NOW_EPOCH=$(date +%s)
+            AGE=$(( NOW_EPOCH - CREATED_EPOCH ))
 
-            # Check if issue was created carrying 'agent'
-            if [ -n "$PREV_OPENED_RUN" ] && [ "${{ contains(github.event.issue.labels.*.name, 'agent') }}" = "true" ]; then
-              # Verify if the creation event already carried agent
-              CREATED_AT="${{ github.event.issue.created_at }}"
-              UPDATED_AT="${{ github.event.issue.updated_at }}"
-              # During initial creation burst, created_at and updated_at are within a few seconds
-              CREATED_EPOCH=$(date -d "$CREATED_AT" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$CREATED_AT" +%s 2>/dev/null || echo 0)
-              UPDATED_EPOCH=$(date -d "$UPDATED_AT" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$UPDATED_AT" +%s 2>/dev/null || echo 0)
-              DIFF=$(( UPDATED_EPOCH - CREATED_EPOCH ))
-              if [ "$DIFF" -ge 0 ] && [ "$DIFF" -le 10 ]; then
+            # Only check for duplicate creation event if issue was created in the last 60 seconds
+            if [ "$AGE" -ge 0 ] && [ "$AGE" -le 60 ]; then
+              TARGET_TITLE="notify-grok #$ISSUE_NUMBER (opened)"
+              # Find if an 'opened' run exists for this specific issue that succeeded or is in-progress
+              OPENED_RUN=$(gh run list \
+                --workflow=notify-grok.yml \
+                --event=issues \
+                --json databaseId,conclusion,status,displayTitle \
+                -q "[.[] | select(.displayTitle == \"$TARGET_TITLE\" and (.conclusion == \"success\" or .status == \"in_progress\"))] | first // empty" \
+                2>/dev/null || true)
+
+              if [ -n "$OPENED_RUN" ]; then
                 echo "duplicate=true" >> "$GITHUB_OUTPUT"
-                echo "::notice::Skipping duplicate notification: issue #$ISSUE_NUMBER was already dispatched on 'opened' (run $PREV_OPENED_RUN)."
+                echo "::notice::Skipping duplicate notification: issue #$ISSUE_NUMBER was already dispatched on 'opened'."
                 exit 0
               fi
             fi

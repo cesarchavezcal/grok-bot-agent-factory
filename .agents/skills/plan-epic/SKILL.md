@@ -22,10 +22,11 @@ Planning-only orchestrator skill for high-level initiative tickets tagged with `
      └─ Exactly ONE sub-issue (the final one in sequence) receives the 'deploy' label
      ↓
 4. Mandatory Post-Creation Verification Gate:
-     ├─ Inspect each created issue via `gh issue view`
-     ├─ Repair any missing 'agent' or invalid 'deploy' counts
-     ├─ Re-inspect and verify: 100% have 'agent', exactly 1 has 'deploy'
-     └─ If verification fails after repair: hard exit non-zero (exit 1)
+     ├─ Repair any missing 'agent' labels across all sub-issues
+     ├─ Strip 'deploy' from all intermediate sub-issues if present
+     ├─ Ensure 'deploy' is applied to the final sub-issue
+     ├─ Re-inspect and verify: 100% have 'agent', intermediates lack 'deploy', final has 'deploy'
+     └─ If any condition fails: hard exit non-zero (exit 1)
 ```
 
 ---
@@ -94,54 +95,70 @@ When creating sub-issues in GitHub (via `gh issue create`) or Linear:
 ## Phase 4: Mandatory Label Verification Gate
 
 Before completing the skill:
-1. **Initial Inspection**:
+1. **Initial Inspection & Agent Label Repair**:
    ```bash
-   DEPLOY_COUNT=0
    for NUM in "${CREATED_NUMBERS[@]}"; do
      LABELS_JSON=$(gh issue view "$NUM" --json labels --jq '[.labels[].name]')
      if ! echo "$LABELS_JSON" | grep -q '"agent"'; then
        echo "Repairing missing agent label on #$NUM..."
        gh issue edit "$NUM" --add-label "agent"
      fi
-     if echo "$LABELS_JSON" | grep -q '"deploy"'; then
-       DEPLOY_COUNT=$(( DEPLOY_COUNT + 1 ))
-     fi
    done
    ```
-2. **Deploy Label Repair**:
-   - If `DEPLOY_COUNT === 0`: Add `deploy` to the final sub-issue (using bash 3.2-compatible index):
-     ```bash
-     FINAL_INDEX=$(( ${#CREATED_NUMBERS[@]} - 1 ))
-     FINAL_NUM="${CREATED_NUMBERS[$FINAL_INDEX]}"
-     echo "Repairing missing deploy label on final issue #$FINAL_NUM..."
-     gh issue edit "$FINAL_NUM" --add-label "deploy"
-     ```
-   - If `DEPLOY_COUNT > 1`: Strip `deploy` from all intermediate sub-issues:
-     ```bash
-     FINAL_INDEX=$(( ${#CREATED_NUMBERS[@]} - 1 ))
-     for ((i=0; i<FINAL_INDEX; i++)); do
-       NUM="${CREATED_NUMBERS[i]}"
-       gh issue edit "$NUM" --remove-label "deploy"
-     done
-     ```
-3. **Strict Post-Repair Validation Gate**:
-   - Re-inspect every issue in `${CREATED_NUMBERS[@]}` to ensure 100% compliance:
-     ```bash
-     VERIFIED_DEPLOY=0
-     for NUM in "${CREATED_NUMBERS[@]}"; do
-       VERIFIED_LABELS=$(gh issue view "$NUM" --json labels --jq '[.labels[].name]')
-       if ! echo "$VERIFIED_LABELS" | grep -q '"agent"'; then
-         echo "FATAL: Sub-issue #$NUM is still missing 'agent' label!" >&2
-         exit 1
-       fi
-       if echo "$VERIFIED_LABELS" | grep -q '"deploy"'; then
-         VERIFIED_DEPLOY=$(( VERIFIED_DEPLOY + 1 ))
-       fi
-     done
 
-     if [ "$VERIFIED_DEPLOY" -ne 1 ]; then
-       echo "FATAL: Expected exactly 1 deploy label, found $VERIFIED_DEPLOY!" >&2
+2. **Deploy Label Repair**:
+   ```bash
+   FINAL_INDEX=$(( ${#CREATED_NUMBERS[@]} - 1 ))
+   FINAL_NUM="${CREATED_NUMBERS[$FINAL_INDEX]}"
+
+   # A. Strip 'deploy' from all intermediate sub-issues (0 to FINAL_INDEX - 1) if present
+   for ((i=0; i<FINAL_INDEX; i++)); do
+     NUM="${CREATED_NUMBERS[i]}"
+     INTER_LABELS=$(gh issue view "$NUM" --json labels --jq '[.labels[].name]')
+     if echo "$INTER_LABELS" | grep -q '"deploy"'; then
+       echo "Removing erroneous deploy label from intermediate issue #$NUM..."
+       gh issue edit "$NUM" --remove-label "deploy"
+     fi
+   done
+
+   # B. Ensure the final sub-issue has the 'deploy' label
+   FINAL_LABELS=$(gh issue view "$FINAL_NUM" --json labels --jq '[.labels[].name]')
+   if ! echo "$FINAL_LABELS" | grep -q '"deploy"'; then
+     echo "Adding deploy label to final sub-issue #$FINAL_NUM..."
+     gh issue edit "$FINAL_NUM" --add-label "deploy"
+   fi
+   ```
+
+3. **Strict Post-Repair Validation Gate**:
+   ```bash
+   FINAL_INDEX=$(( ${#CREATED_NUMBERS[@]} - 1 ))
+   FINAL_NUM="${CREATED_NUMBERS[$FINAL_INDEX]}"
+
+   # 1. 100% of sub-issues carry 'agent'
+   for NUM in "${CREATED_NUMBERS[@]}"; do
+     V_LABELS=$(gh issue view "$NUM" --json labels --jq '[.labels[].name]')
+     if ! echo "$V_LABELS" | grep -q '"agent"'; then
+       echo "FATAL: Sub-issue #$NUM is missing 'agent' label!" >&2
        exit 1
      fi
-     ```
+   done
+
+   # 2. Intermediate sub-issues MUST NOT carry 'deploy'
+   for ((i=0; i<FINAL_INDEX; i++)); do
+     NUM="${CREATED_NUMBERS[i]}"
+     V_LABELS=$(gh issue view "$NUM" --json labels --jq '[.labels[].name]')
+     if echo "$V_LABELS" | grep -q '"deploy"'; then
+       echo "FATAL: Intermediate sub-issue #$NUM carries 'deploy' label!" >&2
+       exit 1
+     fi
+   done
+
+   # 3. Final sub-issue MUST carry 'deploy'
+   FINAL_V_LABELS=$(gh issue view "$FINAL_NUM" --json labels --jq '[.labels[].name]')
+   if ! echo "$FINAL_V_LABELS" | grep -q '"deploy"'; then
+     echo "FATAL: Final sub-issue #$FINAL_NUM is missing 'deploy' label!" >&2
+     exit 1
+   fi
+   ```
+
 4. Output the verified list of sub-issues with their issue numbers, titles, and labels in the thread final message.
