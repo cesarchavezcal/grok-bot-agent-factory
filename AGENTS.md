@@ -52,7 +52,22 @@ What [`./scripts/init.sh`](scripts/init.sh) does (idempotent, safe to re-run at 
 
 ---
 
-## 2. Pipeline Stages & Skills
+## 2. Workflow & Agent-Run Rules (Plan-Then-Build & GitHub Account)
+
+- **Plan-Then-Build Rule**:
+  - Every issue thread starts with a short plan in the thread (files, tests, verification).
+  - If there is **ANY open question**, ask it in the thread and stop without editing files. Wait for the human answer, then build.
+  - If there are **NO questions**, write `"No questions, starting build"` and continue to the build in the same run (no waiting for a separate build message).
+  - Epics (`epic` label) stay planning-only: create the `agent` sub-issues, no build.
+  - Keep all existing gates: PR with `Closes #N`, Grok audit, squash-merge only when `ci` is green AND the audit passes, deploy only for the `deploy` sub-issue.
+- **GitHub Account Rule (`cesarchavezcal`)**:
+  - Every commit, push, and PR must use the GitHub account `cesarchavezcal`.
+  - Check `gh auth status` first before any git push or `gh` command; if the active account is not `cesarchavezcal`, remember the previous active account, switch with `gh auth switch --user cesarchavezcal`, and switch back to the earlier account when done.
+  - Maintain the git email `cesarchavezcal@gmail.com` via `includeIf`, and never change the global git email.
+
+---
+
+## 3. Pipeline Stages & Skills
 
 | Stage | Primary Skill(s) | Active Model (`provider::model`) | Pool |
 | :--- | :--- | :--- | :--- |
@@ -77,7 +92,7 @@ What [`./scripts/init.sh`](scripts/init.sh) does (idempotent, safe to re-run at 
 
 ---
 
-## 3. Communication Rules (Zero Issue/PR Comments)
+## 4. Communication Rules (Zero Issue/PR Comments)
 
 - **NEVER comment on issues or PRs**.
 - When a bug cannot be reproduced, or when grilling/clarification is needed for César:
@@ -90,7 +105,7 @@ What [`./scripts/init.sh`](scripts/init.sh) does (idempotent, safe to re-run at 
 
 ---
 
-## 4. Build, Verification & Merge (`poteto-mode` · `Autopilot-full`)
+## 5. Build, Verification & Merge (`poteto-mode` · `Autopilot-full`)
 
 Execution follows the official pstack [`poteto-mode`](.agents/skills/poteto-mode/SKILL.md) skill, [`tdd`](.agents/skills/tdd/SKILL.md) seam discipline, and the [`Autopilot-full`](.agents/skills/poteto-mode/playbooks/autopilot-full.md) playbook:
 

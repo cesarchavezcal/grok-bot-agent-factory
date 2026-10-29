@@ -25,10 +25,20 @@ This creates/updates:
 - `in-progress` (`#1D76DB`), `rework` (`#D93F0B`), `ready-to-merge` (`#5319E7`), `feature` (`#A2EEEF`), `bug` (`#D73A4A`).
 
 ### Skill Routing Matrix & Priority
-- **`epic` + `agent`** -> **`plan-epic`**: Planning-only thread that decomposes an epic into vertical sub-issues (`Part of #N`). Every created sub-issue MUST get the `agent` label; exactly one final sub-issue receives the `deploy` label. Label existence is verified before completion.
+- **`epic` + `agent`** -> **`plan-epic`**: Planning-only thread that decomposes an epic into vertical sub-issues (`Part of #N`). Every created sub-issue MUST get the `agent` label; exactly one final sub-issue receives the `deploy` label. Label existence is verified before completion. Epics stay planning-only (no build).
   - *Precedence*: `epic` takes priority over all other labels. If an issue has `epic` + `bug` + `agent`, it routes to `plan-epic`.
-- **`bug` + `agent`** -> **`fix-bug`**: Reproduction-first defect workflow. Reproduces first (if unable to reproduce, stops and asks César in thread final message) -> writes failing test -> fixes root cause (`ce-debug`, `tdd`, `principle-fix-root-causes`) -> verifies all tests + runs app once -> Grok audit -> PR `Closes #N` -> merge on green CI.
-- **`agent` alone (or with `feature`)** -> **`implement-ticket`**: Full lifecycle: plan (`grill-with-docs` + `wayfinder`) -> build (`poteto-mode`) -> Grok audit -> rework rule -> PR `Closes #N` -> merge on green CI.
+- **`bug` + `agent`** -> **`fix-bug`**: Reproduction-first defect workflow. Starts with a short plan in the thread. Reproduces first (if unable to reproduce or open questions exist, stops and asks in thread final message; if no questions, writes `"No questions, starting build"` and builds immediately in the same run) -> writes failing test -> fixes root cause (`ce-debug`, `tdd`, `principle-fix-root-causes`) -> verifies all tests + runs app once -> Grok audit -> PR `Closes #N` -> merge on green CI.
+- **`agent` alone (or with `feature`)** -> **`implement-ticket`**: Full lifecycle: starts with a short plan in the thread. If open questions exist, stops and asks in thread final message; if no questions, writes `"No questions, starting build"` and continues directly to build in the same run without waiting for a separate build message (`wayfinder` + `grill-with-docs` -> `poteto-mode` -> Grok audit -> rework rule -> PR `Closes #N` -> merge on green CI).
+- **Plan-Then-Build Rule**:
+  - Every issue thread starts with a short plan in the thread (files, tests, verification).
+  - If there is ANY open question, ask it in the thread and stop without editing files. Wait for the human answer, then build.
+  - If there are NO questions, write `"No questions, starting build"` and continue to the build in the same run (no waiting for a separate build message).
+  - Epics (`epic` label) stay planning-only: create the `agent` sub-issues, no build.
+  - Keep all existing gates: PR with `Closes #N`, Grok audit, squash-merge only when `ci` is green AND the audit passes, deploy only for the `deploy` sub-issue.
+- **GitHub Account Rule (`cesarchavezcal`)**:
+  - Every commit, push, and PR must use the `cesarchavezcal` account.
+  - Check `gh auth status` first before any push or `gh` command; if the active account is not `cesarchavezcal`, remember the active account, switch using `gh auth switch --user cesarchavezcal`, and switch back when done.
+  - Keep git email `cesarchavezcal@gmail.com` via `includeIf`, never changing the global git email.
 - **Manual Labeling Order (`epic` before `agent`)**: When manually labeling an existing issue in GitHub or Linear, **always add `epic` before `agent`** so `epic` is already present on the issue payload when `agent` triggers `notify-grok.yml`.
 - **Deploy Rule**: Intermediate sub-issues never deploy. Deploy occurs only on the final sub-issue of an epic (carrying the `deploy` label), after its green merge.
 - **Issue Closing Rule**: Every PR body uses `Closes #N` (never `Refs #N`). For epics, the final deploy sub-issue PR also includes `Closes #EPIC`. Agents never close issues by hand.
