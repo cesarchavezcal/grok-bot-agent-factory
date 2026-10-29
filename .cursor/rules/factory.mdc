@@ -13,8 +13,9 @@ This repository follows the **Grok Bot Agent Factory** autonomous workflow. Read
 
 ## 1. Intake Gate (`agent` & `epic` Labels)
 - Process **only** GitHub Issues or Linear Issues carrying the `agent` label. Ignore all other issues.
-- **`agent` alone** = normal issue (full plan, build, verify, and merge pipeline).
-- **`epic` + `agent`** = planning-only thread that creates sub-issues labeled `agent` (`Part of #N`), where the last one is deploy. Always add `epic` before `agent`.
+- **`agent` alone** = normal issue (full plan, build, verify, and merge pipeline). Its PR body uses `Closes #N` (never `Refs #N`) so the issue closes when the PR merges.
+- **`epic` + `agent`** = planning-only thread that creates sub-issues labeled `agent` (`Part of #N`), where the last one is deploy. Each sub-issue PR uses `Closes #N`, and the last (deploy) sub-issue PR also includes `Closes #EPIC` so merging the final PR closes both the deploy sub-issue and the epic. Always add `epic` before `agent`.
+- Agents never close issues by hand; issues close only when their PR merges.
 - Track active work in `.factory/work-items/<id>.json` (conforming to `.factory/work-item.schema.json`). Do not commit runtime work-item instances unless requested.
 
 ## 2. Planning & Grilling (Official `mattpocock/skills`)
@@ -26,6 +27,7 @@ This repository follows the **Grok Bot Agent Factory** autonomous workflow. Read
 ## 3. Build, Verification & Merge (`poteto-mode` · `Autopilot-full`)
 - Building runs exclusively through official pstack `/poteto-mode` (`.agents/skills/poteto-mode/SKILL.md`) using the **`Autopilot-full`** playbook (`.agents/skills/poteto-mode/playbooks/autopilot-full.md`) and seam-first [`tdd`](.agents/skills/tdd/SKILL.md).
 - **Max Concurrency**: `3` isolated Git worktrees off `main` in parallel (never stacked).
+- **PR Issue Closing**: Every PR body MUST include `Closes #N` (never `Refs #N`) so the issue closes when the PR merges; for epics, the last (deploy) sub-issue PR also includes `Closes #EPIC`. Agents never close issues by hand.
 - **Proof & Merge Gate**:
   1. Green CI check (`ci`).
   2. Independent runtime verification via `.agents/skills/verify-app` (or `verify-<app>`) with `exitCode === 0` and saved evidence in `artifacts/<work-item-id>/`.

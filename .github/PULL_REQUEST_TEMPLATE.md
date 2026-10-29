@@ -1,6 +1,6 @@
 ## Summary
 
-- **Source Issue / Ticket**: <!-- e.g. Closes #12 or LIN-123 (must have `agent` label) -->
+- **Source Issue / Ticket**: <!-- e.g. Closes #12 (for an epic's last deploy sub-issue PR, also include Closes #EPIC) or LIN-123; never use Refs #N -->
 - **Specification / Plan**: <!-- e.g. docs/specs/<slug>.md -->
 - **Playbook**: `poteto-mode` (`Autopilot-full`)
 

@@ -56,8 +56,9 @@ Inside any working repository derived from this template (or from a template che
    - Only GitHub Issues or Linear Issues labeled with **`agent`** are ingested. Everything else is ignored.
    - [`.github/workflows/notify-grok.yml`](.github/workflows/notify-grok.yml) triggers on `issues` (`types: [labeled]`) when `github.event.label.name == 'agent'` and `POST`s the GitHub event payload to `GROK_WEBHOOK_URL` (with `Authorization: $GROK_WEBHOOK_AUTH`), exiting `0` with a `::notice::` if either secret is unset.
    - **Normal vs. Epic Issues**:
-     - **`agent` alone** = normal issue (full plan, build, verify, and merge pipeline).
-     - **`epic` + `agent`** = planning-only thread that splits the work into sub-issues labeled `agent` (`Part of #N`), where the last sub-issue is deploy. **Add `epic` before `agent`** so the `epic` label is already present on the issue payload when adding `agent` triggers `notify-grok.yml`.
+     - **`agent` alone** = normal issue (full plan, build, verify, and merge pipeline). Its PR body uses `Closes #N` (never `Refs #N`) so the issue closes when the PR merges.
+     - **`epic` + `agent`** = planning-only thread that splits the work into sub-issues labeled `agent` (`Part of #N`), where the last sub-issue is deploy. Each sub-issue PR uses `Closes #N`, and the last (deploy) sub-issue PR also includes `Closes #EPIC` so the epic closes when the deploy PR merges. **Add `epic` before `agent`** so the `epic` label is already present on the issue payload when adding `agent` triggers `notify-grok.yml`.
+     - **Issue Closing**: Agents never close issues by hand; issues close only when their PR merges.
 2. **Planning (`mattpocock/skills`)**:
    - Uses the full official skills installed from `mattpocock/skills` and locked in [`skills-lock.json`](skills-lock.json):
      - [`wayfinder`](.agents/skills/wayfinder/SKILL.md)
@@ -72,6 +73,7 @@ Inside any working repository derived from this template (or from a template che
 4. **Build & Merge (`pstack` `poteto-mode` · `Autopilot-full`)**:
    - Uses official [`poteto-mode`](.agents/skills/poteto-mode/SKILL.md) (`cursor/plugins`, locked in [`skills-lock.json`](skills-lock.json)) under the [`Autopilot-full`](.agents/skills/poteto-mode/playbooks/autopilot-full.md) playbook + [`tdd`](.agents/skills/tdd/SKILL.md).
    - Runs up to **3 concurrent worktrees** off `main`.
+   - Every PR body uses `Closes #N` (never `Refs #N`) so the issue closes when the PR merges; for epics, the last (deploy) sub-issue PR also includes `Closes #EPIC`. Agents never close issues by hand.
    - Merges via **squash merge** only when **`ci` is green** AND **independent verification** ([`verify-app`](.agents/skills/verify-app/SKILL.md) runtime proof + `grok-4.7` adversarial interrogation) passes.
 
 ---
