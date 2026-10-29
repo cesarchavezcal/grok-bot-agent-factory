@@ -14,10 +14,10 @@ This repository follows the **Grok Bot Agent Factory** autonomous workflow. Read
 ## 1. Intake Gate & Skill Routing (`agent`, `bug`, `epic` Labels)
 - Process **only** GitHub Issues or Linear Issues carrying the `agent` label. Ignore all other issues.
 - **Routing Matrix & Precedence**:
-  - **`epic` + `agent`** -> **`plan-epic`**: Planning-only thread that decomposes an epic into vertical sub-issues (`Part of #N`). Every created sub-issue MUST get the `agent` label; exactly one final sub-issue gets the `deploy` label. Verify all sub-issues have `agent` before ending.
+  - **`epic` + `agent`** -> **`plan-epic`**: Planning-only thread that decomposes an epic into vertical sub-issues (`Part of #N`). Every created sub-issue MUST get the `agent` label; exactly one final sub-issue gets the `deploy` label. Verify all sub-issues have `agent` before ending. Epics stay planning-only (no build).
     - *Precedence*: `epic` takes priority over all other labels. If an issue carries `epic` + `bug` + `agent`, it routes to `plan-epic`.
-  - **`bug` + `agent`** -> **`fix-bug`**: Read issue/error/logs -> reproduce first (if it cannot reproduce, stop and ask César in thread final message) -> write a failing test -> fix the root cause (`ce-debug`, `tdd`, `principle-fix-root-causes`) -> verify all tests + run the app once -> Grok audit -> PR `Closes #N` -> squash merge on green.
-  - **`agent` alone (or with `feature`)** -> **`implement-ticket`**: Full lifecycle: plan (`grill-with-docs` + `wayfinder`) -> build (`poteto-mode` reproduce, test, fix, verify) -> Grok audit -> rework rule -> PR `Closes #N` -> squash merge on green CI.
+  - **`bug` + `agent`** -> **`fix-bug`**: Starts with short plan in thread. Read issue/error/logs -> reproduce first (if cannot reproduce or open questions, stop and ask in thread final message; if no questions, write "No questions, starting build" and build immediately in same run) -> write failing test -> fix root cause (`ce-debug`, `tdd`, `principle-fix-root-causes`) -> verify all tests + run app once -> Grok audit -> PR `Closes #N` -> squash merge on green.
+  - **`agent` alone (or with `feature`)** -> **`implement-ticket`**: Starts with short plan in thread. If questions, stop and ask in thread final message; if no questions, write "No questions, starting build" and continue to build in same run -> plan (`grill-with-docs` + `wayfinder`) -> build (`poteto-mode` reproduce, test, fix, verify) -> Grok audit -> rework rule -> PR `Closes #N` -> squash merge on green CI.
 - **Manual Labeling Order (`epic` before `agent`)**:
   - When manually adding labels to an existing issue in GitHub or Linear, **always add `epic` before `agent`** so `epic` is already present on the issue payload when `agent` triggers `.github/workflows/notify-grok.yml`.
 - **Deploy Rule**:
@@ -26,7 +26,19 @@ This repository follows the **Grok Bot Agent Factory** autonomous workflow. Read
 - **Issue Closing**: Every PR body MUST include `Closes #N` (never `Refs #N`) so the issue closes when the PR merges; for epics, the final deploy sub-issue PR also includes `Closes #EPIC`. Agents never close issues by hand.
 - Track active work in `.factory/work-items/<id>.json` (conforming to `.factory/work-item.schema.json`). Do not commit runtime work-item instances unless requested.
 
-## 2. Communication Rules (Zero Issue/PR Comments)
+## 2. Workflow & Agent-Run Rules (Plan-Then-Build & GitHub Account)
+- **Plan-Then-Build**:
+  - Every issue thread starts with a short plan in the thread (files, tests, verification).
+  - If there is ANY open question, ask it in the thread and stop without editing files. Wait for the human answer, then build.
+  - If there are NO questions, write `"No questions, starting build"` and continue to the build in the same run (no waiting for a separate build message).
+  - Epics (`epic` label) stay planning-only: create the `agent` sub-issues, no build.
+  - Keep all existing gates: PR with `Closes #N`, Grok audit, squash-merge only when `ci` is green AND the audit passes, deploy only for the `deploy` sub-issue.
+- **GitHub Account Rule (`cesarchavezcal`)**:
+  - Every commit, push, and PR must use the `cesarchavezcal` account.
+  - Check `gh auth status` first before any push or `gh` command. If the active account is not `cesarchavezcal`, remember the active account, switch using `gh auth switch --user cesarchavezcal`, and switch back to the earlier account when done.
+  - Maintain git email `cesarchavezcal@gmail.com` via `includeIf`, never changing the global git email.
+
+## 3. Communication Rules (Zero Issue/PR Comments)
 - **NEVER comment on issues or PRs**.
 - When a bug cannot be reproduced, or when grilling/clarification is needed for César:
   1. Deduce everything possible from the codebase, tests, and existing docs first.
@@ -34,7 +46,7 @@ This repository follows the **Grok Bot Agent Factory** autonomous workflow. Read
   3. Write the numbered questions or reproduction block directly in the **thread final message**.
   4. The external dispatcher (**Grok Bot**) relays the message to César. Do NOT post a GitHub/Linear comment or add a `waiting-for-human` comment.
 
-## 3. Build, Verification & Merge
+## 4. Build, Verification & Merge
 - Building runs exclusively through official pstack `/poteto-mode` (`.agents/skills/poteto-mode/SKILL.md`) using the **`Autopilot-full`** playbook (`.agents/skills/poteto-mode/playbooks/autopilot-full.md`) and seam-first [`tdd`](.agents/skills/tdd/SKILL.md).
 - **Max Concurrency**: `3` isolated Git worktrees off `main` in parallel (never stacked).
 - **Proof & Merge Gate**:
@@ -45,7 +57,7 @@ This repository follows the **Grok Bot Agent Factory** autonomous workflow. Read
   - Merge using `gh pr merge <PR_NUMBER> --squash`.
   - **Strict Rule**: NEVER pass `--delete-branch`. Never delete branches.
 
-## 4. Model Routing & Rework Escalation (Zero API Keys, Zero Claude, Zero Argon)
+## 5. Model Routing & Rework Escalation (Zero API Keys, Zero Claude, Zero Argon)
 - **Scout**: `antigravity::gemini-3.8-flash-low` (`AGY_FAST`, low effort).
 - **Spec & Plan**: `antigravity::gemini-3.8-flash-high` (`AGY_FAST`, high effort).
 - **UI / CRUD / Standard Build**: `antigravity::gemini-3.8-flash-medium` (`AGY_FAST`, medium effort).

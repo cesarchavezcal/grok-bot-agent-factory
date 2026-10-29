@@ -12,11 +12,11 @@ High-level bug fixing skill for autonomous defect triage, reproduction-first dia
 ## Workflow Overview
 
 ```
-1. Intake: Read issue, description, reproduction steps, and error logs
+1. Intake: Read issue, reproduction steps, and error logs (short plan in thread)
      ↓
 2. Reproduce First (Hard Gate)
-     ├─ Cannot reproduce? → STOP immediately. Write question in thread final message (NEVER comment on issue).
-     └─ Reproduced! → Proceed to Phase 3.
+     ├─ Cannot reproduce or open questions? → STOP immediately. Write in thread final message (NEVER comment on issue).
+     └─ Reproduced & no questions! → Write "No questions, starting build" and proceed immediately to Phase 3.
 3. Write Failing Test (Red Phase via tdd)
      ↓
 4. Root Cause Fix (ce-debug + principle-fix-root-causes)
@@ -32,10 +32,16 @@ High-level bug fixing skill for autonomous defect triage, reproduction-first dia
 
 ---
 
-## Phase 1: Intake & Triage
+## Phase 1: Intake & Triage (Plan-Then-Build Protocol)
 
 - **Trigger**: Issue carries labels `bug` + `agent` (and does NOT carry `epic`).
   - *Precedence Rule*: If an issue carries `epic` + `bug` + `agent`, **`plan-epic` takes precedence**.
+- **Plan-Then-Build Protocol**:
+  - Every issue thread starts with a short plan directly in the thread (reproduction approach, files to inspect/modify, tests to author, verification).
+- **GitHub Account & Identity Invariant**:
+  - Every commit, push, and PR must use the GitHub account `cesarchavezcal`.
+  - Check `gh auth status` first before any push or `gh` command; if not `cesarchavezcal`, remember the active account, switch using `gh auth switch --user cesarchavezcal`, and switch back when done.
+  - Maintain git email `cesarchavezcal@gmail.com` via `includeIf`, and never change the global git email.
 - Extract structured inputs from the bug issue form:
   - **What happened** (unexpected behavior or crash symptom)
   - **Expected behavior** (desired correct state)
@@ -50,11 +56,15 @@ High-level bug fixing skill for autonomous defect triage, reproduction-first dia
   - Run the steps in a local checkout or isolated test environment.
   - Confirm the exact error or failure symptom described in the issue.
 - **Stop-and-Ask Rule**:
-  - If the bug CANNOT be reproduced after attempting the provided steps and inspecting logs:
+  - If the bug CANNOT be reproduced after attempting the provided steps and inspecting logs, or if ANY open question remains:
     - **DO NOT guess, assume, or apply speculative fixes.**
     - **NEVER comment on the GitHub/Linear issue or PR.**
-    - Stop execution immediately.
+    - Stop execution immediately without editing files.
     - Write the detailed reproduction obstacle and questions for César in the **thread final message**. The external dispatcher (**Grok Bot**) will relay it to César.
+- **No Questions Gate (Immediate Build)**:
+  - If the bug is reproduced and there are NO open questions:
+    - Write `"No questions, starting build"`.
+    - Continue immediately to the build (Phase 3 Failing Test & Phase 4 Root Cause Fix) in the same run without waiting for a separate build message.
 
 ---
 
@@ -114,12 +124,16 @@ Enforce root-cause engineering discipline directly in the fix:
 
 ## Phase 7: PR & Squash Merge
 
-1. **Branch & PR**:
+1. **GitHub Account & Identity Rule**:
+   - Every commit, push, and PR must use the GitHub account `cesarchavezcal`.
+   - Run `gh auth status` first before any push or `gh` command. If the active account is not `cesarchavezcal`, remember the previous active account, switch using `gh auth switch --user cesarchavezcal`, and switch back to the earlier account when done.
+   - Maintain the git email `cesarchavezcal@gmail.com` via `includeIf`, and never change the global git email.
+2. **Branch & PR**:
    - Create branch: `fix/<issue-number>-<short-description>`.
    - Commit as `cesarchavezcal` (`cesarchavezcal@gmail.com`).
    - PR body MUST include `Closes #N` so GitHub automatically closes the bug report upon merge. If the bug is the final deploy sub-issue of an epic, also include `Closes #<EPIC_NUMBER>`.
    - Include root-cause explanation, reproduction evidence, and test diff in the PR description.
-2. **Squash Merge**:
+3. **Squash Merge**:
    - Merge ONLY when required status check **`ci`** is green and Grok audit returns `PASS`.
    - Merge command (never delete branches):
      ```bash
