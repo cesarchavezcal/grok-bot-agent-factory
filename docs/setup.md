@@ -179,3 +179,14 @@ Derived working repositories can pull factory infrastructure updates from the pr
 4. **Never Touches App Code**: Application source files, `.factory/config.json` (which stores the working repo's `app` slug and `verifySkill`), `.factory/work-items`, and `.agents/skills/verify-app/features` are preserved.
 5. **Idempotent**: If no managed files changed, it prints an up-to-date message and exits `0` without creating a branch or opening a PR.
 6. **Version Tracking (`.factory/template-version`)**: When managed files change, it records the synced 40-character template commit SHA in `.factory/template-version`, prints a diff summary, pushes `chore/template-sync-<short-sha>`, and opens (or updates) a Pull Request against `main`.
+
+---
+
+## 7. Troubleshooting
+
+Common issues and their resolutions:
+
+1. **The webhook doesn't fire**: Check that the issue has the `agent` label and that the `GROK_WEBHOOK_URL` and auth secrets are set in the repo settings (`GROK_WEBHOOK_URL` and `GROK_WEBHOOK_AUTH` under **Settings → Secrets and variables → Actions**).
+2. **The webhook fires twice**: Check that `.github/workflows/notify-grok.yml` only triggers on `labeled` with `github.event.label.name == 'agent'`.
+3. **Commits use the wrong GitHub account**: Run `gh auth status` and switch with `gh auth switch --user <account>`. Ensure the git author email matches `cesarchavezcal@gmail.com`.
+
