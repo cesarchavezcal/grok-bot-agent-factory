@@ -12,7 +12,7 @@ High-level orchestrator skill designed for autonomous feature tickets and issue-
 ## Workflow Overview
 
 ```
-1. Intake & Context Scout (Configured builder or scout model)
+1. Intake & Context Scout (Configured builder or subagents model)
      ↓
 2. Planning & Grilling (Configured planner model from models.yml: plan in thread; questions? stop & ask; no questions? build immediately)
      ↓

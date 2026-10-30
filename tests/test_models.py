@@ -148,6 +148,30 @@ class TestModelsConfig(unittest.TestCase):
         # Reset back to template defaults
         subprocess.run([SETUP_SCRIPT, "--defaults"], check=True)
 
+    def test_setup_script_interactive(self):
+        import pty
+        master, slave = pty.openpty()
+        proc = subprocess.Popen(
+            [SETUP_SCRIPT],
+            stdin=slave,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            close_fds=True,
+        )
+        os.close(slave)
+        # Choice 1 for builder (gemini-3.8-flash-low), choice 4 for auditor (grok-4.7), Y for all roles
+        os.write(master, b"1\n4\nY\n")
+        stdout, stderr = proc.communicate()
+        os.close(master)
+        self.assertEqual(proc.returncode, 0, f"Interactive setup failed: {stderr.decode()}")
+        data = validate_models(MODELS_FILE, ALLOWED_FILE)
+        self.assertEqual(data["builder"], "gemini-3.8-flash-low")
+        self.assertEqual(data["auditor"], "grok-4.7")
+        self.assertEqual(data["planner"], "gemini-3.8-flash-low")
+
+        # Reset back to template defaults
+        subprocess.run([SETUP_SCRIPT, "--defaults"], check=True)
+
 
 if __name__ == "__main__":
     unittest.main()

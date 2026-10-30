@@ -47,6 +47,7 @@ def test_workflow_structure():
     assert "labels" in run_script, "Must keep labels in jq"
     assert "models" in run_script, "Must pass models to jq"
     assert "models.yml" in run_script, "Must read models.yml"
+    assert "validate_models.py" in run_script, "Must validate models.yml before dispatching webhook"
 
 def simulate_event(workflow_types, job_if_expr, action, label_name, issue_labels):
     # Simulates GitHub Actions intake logic

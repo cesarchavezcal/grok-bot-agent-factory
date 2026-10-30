@@ -56,11 +56,17 @@ TEMPLATE_DEFAULT_AUDITOR="grok-4.7"
 
 DEFAULT_BUILDER="$TEMPLATE_DEFAULT_BUILDER"
 DEFAULT_AUDITOR="$TEMPLATE_DEFAULT_AUDITOR"
+CURRENT_PLANNER=""
+CURRENT_EPIC_PLANNER=""
+CURRENT_SUBAGENTS=""
 
-# If models.yml already exists, read existing values for interactive prompt defaults
+# If models.yml already exists, read existing values for defaults
 if [ -f "$MODELS_FILE" ]; then
   CURRENT_BUILDER="$(python3 -c "import yaml; print(yaml.safe_load(open('$MODELS_FILE')).get('builder', ''))" 2>/dev/null || echo "")"
   CURRENT_AUDITOR="$(python3 -c "import yaml; print(yaml.safe_load(open('$MODELS_FILE')).get('auditor', ''))" 2>/dev/null || echo "")"
+  CURRENT_PLANNER="$(python3 -c "import yaml; print(yaml.safe_load(open('$MODELS_FILE')).get('planner', ''))" 2>/dev/null || echo "")"
+  CURRENT_EPIC_PLANNER="$(python3 -c "import yaml; print(yaml.safe_load(open('$MODELS_FILE')).get('epic_planner', ''))" 2>/dev/null || echo "")"
+  CURRENT_SUBAGENTS="$(python3 -c "import yaml; print(yaml.safe_load(open('$MODELS_FILE')).get('subagents', ''))" 2>/dev/null || echo "")"
   [ -n "$CURRENT_BUILDER" ] && DEFAULT_BUILDER="$CURRENT_BUILDER"
   [ -n "$CURRENT_AUDITOR" ] && DEFAULT_AUDITOR="$CURRENT_AUDITOR"
 fi
@@ -103,7 +109,7 @@ while [ $# -gt 0 ]; do
       echo "Usage: ./scripts/setup-models.sh [options]"
       echo ""
       echo "Options:"
-      echo "  --defaults                   Apply default models (builder: gemini-3.8-flash-high, auditor: grok-4.7)"
+      echo "  --defaults                   Apply template defaults (builder: gemini-3.8-flash-high, auditor: grok-4.7)"
       echo "  --builder <model>            Builder model"
       echo "  --auditor <model>            Auditor model (must differ from builder)"
       echo "  --planner <model>            Planner model (defaults to builder)"
@@ -127,7 +133,7 @@ if [ "$USE_DEFAULTS" -eq 1 ]; then
   CHOSEN_SUBAGENTS="$CHOSEN_BUILDER"
 fi
 
-# Interactive selection helper
+# Interactive selection helper: all output to stderr except chosen model string
 select_model() {
   local prompt_label="$1"
   local current_default="$2"
@@ -135,8 +141,8 @@ select_model() {
   local chosen=""
 
   while true; do
-    echo ""
-    echo "Select $prompt_label model:"
+    echo "" >&2
+    echo "Select $prompt_label model:" >&2
     local i=1
     for m in "${ALLOWED_MODELS[@]}"; do
       local note=""
@@ -146,11 +152,11 @@ select_model() {
       if [ -n "$exclude_model" ] && [ "$m" = "$exclude_model" ]; then
         note=" (disallowed: matches builder)"
       fi
-      echo "  [$i] $m$note"
+      echo "  [$i] $m$note" >&2
       i=$((i + 1))
     done
 
-    printf "Enter choice [1-%d] or model name (default: %s): " "${#ALLOWED_MODELS[@]}" "$current_default"
+    printf "Enter choice [1-%d] or model name (default: %s): " "${#ALLOWED_MODELS[@]}" "$current_default" >&2
     local input=""
     read -r input || input=""
     input="$(echo "$input" | xargs)"
@@ -177,23 +183,32 @@ select_model() {
   done
 }
 
-# If builder or auditor not provided via args
-if [ -z "$CHOSEN_BUILDER" ]; then
-  if [ -t 0 ] && [ "$USE_DEFAULTS" -eq 0 ]; then
-    echo "============================================================"
-    echo "🤖 Grok Bot Agent Factory — Model Setup"
-    echo "============================================================"
-    CHOSEN_BUILDER="$(select_model "BUILDER" "$DEFAULT_BUILDER")"
-  else
-    CHOSEN_BUILDER="$DEFAULT_BUILDER"
-  fi
-fi
+# Interactive prompts when on TTY or stdin is available and builder/auditor not provided via flags
+if [ -z "$CHOSEN_BUILDER" ] || [ -z "$CHOSEN_AUDITOR" ]; then
+  if [ -t 0 ] || [ -p /dev/stdin ] || [ ! -t 0 ]; then
+    # If stdin has input available
+    if [ "$USE_DEFAULTS" -eq 0 ] && [ -t 0 ]; then
+      echo "============================================================" >&2
+      echo "🤖 Grok Bot Agent Factory — Model Setup" >&2
+      echo "============================================================" >&2
+      [ -z "$CHOSEN_BUILDER" ] && CHOSEN_BUILDER="$(select_model "BUILDER" "$DEFAULT_BUILDER")"
+      [ -z "$CHOSEN_AUDITOR" ] && CHOSEN_AUDITOR="$(select_model "AUDITOR" "$DEFAULT_AUDITOR" "$CHOSEN_BUILDER")"
 
-if [ -z "$CHOSEN_AUDITOR" ]; then
-  if [ -t 0 ] && [ "$USE_DEFAULTS" -eq 0 ]; then
-    CHOSEN_AUDITOR="$(select_model "AUDITOR" "$DEFAULT_AUDITOR" "$CHOSEN_BUILDER")"
+      # Prompt for secondary roles or default to builder
+      printf "\nUse '%s' for planner, epic_planner, and subagents? [Y/n]: " "$CHOSEN_BUILDER" >&2
+      read -r USE_BUILDER_FOR_ALL || USE_BUILDER_FOR_ALL=""
+      if [[ "$USE_BUILDER_FOR_ALL" =~ ^[Nn]$ ]]; then
+        [ -z "$CHOSEN_PLANNER" ] && CHOSEN_PLANNER="$(select_model "PLANNER" "$CHOSEN_BUILDER")"
+        [ -z "$CHOSEN_EPIC_PLANNER" ] && CHOSEN_EPIC_PLANNER="$(select_model "EPIC_PLANNER" "$CHOSEN_BUILDER")"
+        [ -z "$CHOSEN_SUBAGENTS" ] && CHOSEN_SUBAGENTS="$(select_model "SUBAGENTS" "$CHOSEN_BUILDER")"
+      fi
+    else
+      [ -z "$CHOSEN_BUILDER" ] && CHOSEN_BUILDER="$DEFAULT_BUILDER"
+      [ -z "$CHOSEN_AUDITOR" ] && CHOSEN_AUDITOR="$DEFAULT_AUDITOR"
+    fi
   else
-    CHOSEN_AUDITOR="$DEFAULT_AUDITOR"
+    [ -z "$CHOSEN_BUILDER" ] && CHOSEN_BUILDER="$DEFAULT_BUILDER"
+    [ -z "$CHOSEN_AUDITOR" ] && CHOSEN_AUDITOR="$DEFAULT_AUDITOR"
   fi
 fi
 
@@ -244,27 +259,7 @@ epic_planner: $CHOSEN_EPIC_PLANNER
 subagents: $CHOSEN_SUBAGENTS
 EOF
 
-# Update .factory/config.json models if config exists
-if [ -f "$ROOT_DIR/.factory/config.json" ]; then
-  CHOSEN_BUILDER="$CHOSEN_BUILDER" \
-  CHOSEN_AUDITOR="$CHOSEN_AUDITOR" \
-  CHOSEN_PLANNER="$CHOSEN_PLANNER" \
-  node -e '
-    const fs = require("fs");
-    const path = ".factory/config.json";
-    try {
-      const cfg = JSON.parse(fs.readFileSync(path, "utf8"));
-      if (cfg.models) {
-        if (cfg.models.planner) cfg.models.planner.model = process.env.CHOSEN_PLANNER;
-        if (cfg.models.builderStandard) cfg.models.builderStandard.model = process.env.CHOSEN_BUILDER;
-        if (cfg.models.interrogator) cfg.models.interrogator.model = process.env.CHOSEN_AUDITOR;
-        fs.writeFileSync(path, JSON.stringify(cfg, null, 2) + "\n", "utf8");
-      }
-    } catch (_) {}
-  '
-fi
-
 # Validate written configuration
-python3 "$ROOT_DIR/scripts/validate-models.py"
+python3 "$ROOT_DIR/scripts/validate_models.py"
 
 echo "✓ Successfully configured models in models.yml"

@@ -32,9 +32,10 @@ jobs:
             echo "::notice::Skipping Grok webhook notification: GROK_WEBHOOK_URL or GROK_WEBHOOK_AUTH secret is not set."
             exit 0
           fi
+          python3 scripts/validate_models.py
           IDEMPOTENCY_KEY="${{ github.repository }}#${{ github.event.issue.number }}"
           DELIVERY_ID="${{ github.event.issue.number }}-${RUN_ID}-${RUN_ATTEMPT}"
-          MODELS_JSON="$(python3 -c "import yaml, json, os; p='models.yml'; d={'builder':'gemini-3.8-flash-high','auditor':'grok-4.7','planner':'gemini-3.8-flash-high','epic_planner':'gemini-3.8-flash-high','subagents':'gemini-3.8-flash-high'}; d.update(yaml.safe_load(open(p)) if os.path.exists(p) else {}); print(json.dumps(d))")"
+          MODELS_JSON="$(python3 -c "import yaml, json; print(json.dumps(yaml.safe_load(open('models.yml'))))")"
           jq --arg idempotency_key "$IDEMPOTENCY_KEY" \
              --arg delivery_id "$DELIVERY_ID" \
              --arg run_id "$RUN_ID" \

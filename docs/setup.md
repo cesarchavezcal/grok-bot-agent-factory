@@ -99,7 +99,7 @@ If a configured model is unavailable in the environment, the factory **stops imm
 `.github/workflows/notify-grok.yml` triggers on `issues` (`types: [labeled]`) and runs only when `github.event.label.name == 'agent'`:
 - When an issue is **created with labels** (e.g., via the `.github/ISSUE_TEMPLATE/bug.yml` issue form), GitHub emits a `labeled` event for each initial label, so exactly one run dispatches when `agent` is processed.
 - When `agent` is **added later to an existing issue**, GitHub emits a `labeled` event for `agent`.
-- The webhook payload includes the full event enriched with an explicit top-level `labels` array, a stable `idempotency_key` (`<repo>#<issue>`), and `delivery_id`.
+- The webhook payload includes the full event enriched with an explicit top-level `labels` array, a stable `idempotency_key` (`<repo>#<issue>`), `delivery_id`, and the validated `models` object from `models.yml`.
 - Concurrency per issue (`cancel-in-progress: false`) ensures events are processed reliably in order.
 
 ### Required Repository Secrets
@@ -122,14 +122,14 @@ If either `GROK_WEBHOOK_URL` or `GROK_WEBHOOK_AUTH` is not configured when an is
 1. Make sure the repo secrets `GROK_WEBHOOK_URL` and `GROK_WEBHOOK_AUTH` are set.
 2. Create a test issue with the `agent` label plus one more label (for example `documentation`).
 3. In the Actions tab, check that `notify-grok` ran exactly once for that issue (one run, triggered by the `agent` label).
-4. Check that Grok Bot received one webhook whose payload has `idempotency_key` equal to `<owner>/<repo>#<issue number>`.
+4. Check that Grok Bot received one webhook whose payload has `idempotency_key` equal to `<owner>/<repo>#<issue number>` and includes the `.models` object.
 5. If you see two runs or two webhooks for the same issue, the duplicate-webhook fix is missing: compare `notify-grok.yml` with the template.
 
 ---
 
 ## 4. Allow Auto-Merge, Squash Merge & Preserve Branches
 
-The `Autopilot-full` playbook merges PRs via **squash merge** once both the **`ci`** status check and independent verification (`verify-app` + Grok 4.7 interrogation) pass. Branches are preserved (`delete_branch_on_merge=false`). Every PR body uses `Closes #N` (never `Refs #N`) so the issue closes when the PR merges, and for epics the last (deploy) sub-issue PR also includes `Closes #EPIC`.
+The `Autopilot-full` playbook merges PRs via **squash merge** once both the **`ci`** status check and independent verification (`verify-app` + independent adversarial audit from `models.yml`) pass. Branches are preserved (`delete_branch_on_merge=false`). Every PR body uses `Closes #N` (never `Refs #N`) so the issue closes when the PR merges, and for epics the last (deploy) sub-issue PR also includes `Closes #EPIC`.
 
 ### CLI (`gh api PATCH`)
 ```bash
