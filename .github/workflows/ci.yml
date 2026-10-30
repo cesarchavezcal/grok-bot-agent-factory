@@ -23,13 +23,19 @@ jobs:
           test -f .factory/work-item.schema.json
           test -f .factory/template-sync.json
           test -f .factory/template-version
+          test -f models.allowed.yml
+          test -f models.yml
           test -x scripts/sync-template.sh
           bash -n scripts/sync-template.sh
           bash -n scripts/init.sh
           test -x scripts/setup-labels.sh
           bash -n scripts/setup-labels.sh
+          test -x scripts/setup-models.sh
+          bash -n scripts/setup-models.sh
+          test -x scripts/validate_models.py
           test -f skills-lock.json
           test -f AGENTS.md
+          python3 scripts/validate_models.py
           node -e '
             const fs = require("fs");
             const rawConfig = fs.readFileSync(".factory/config.json", "utf8");
@@ -46,31 +52,6 @@ jobs:
             // Invariant: Argon is completely retired and forbidden
             if (/argon/i.test(rawConfig)) {
               throw new Error("Argon model detected in .factory/config.json — Argon is retired and forbidden");
-            }
-
-            // Invariant: Gemini Flash effort rule & model orchestration
-            if (cfg.models?.planner?.model !== "gemini-3.8-flash-high") {
-              throw new Error("models.planner.model must be gemini-3.8-flash-high");
-            }
-            if (cfg.models?.rework?.model !== "gemini-3.8-flash-high") {
-              throw new Error("models.rework.model must be gemini-3.8-flash-high");
-            }
-            if (cfg.models?.scout?.model !== "gemini-3.8-flash-low") {
-              throw new Error("models.scout.model must be gemini-3.8-flash-low");
-            }
-            if (cfg.models?.builderStandard?.model !== "gemini-3.8-flash-medium") {
-              throw new Error("models.builderStandard.model must be gemini-3.8-flash-medium");
-            }
-            if (cfg.models?.verifier?.model !== "gemini-3.8-flash-medium") {
-              throw new Error("models.verifier.model must be gemini-3.8-flash-medium");
-            }
-            if (cfg.models?.interrogator?.model !== "grok-4.7") {
-              throw new Error("models.interrogator.model must be grok-4.7");
-            }
-
-            // Invariant: Rework must escalate to a different provider family than the auditor
-            if (cfg.models?.rework?.providerInstanceId === cfg.models?.interrogator?.providerInstanceId) {
-              throw new Error("Rework model provider must differ from interrogator auditor provider");
             }
 
             // Invariant: No argon references in work-item schema or agents or rules
@@ -104,15 +85,24 @@ jobs:
               ".agents/skills/*",
               ".cursor/rules",
               ".cursor/agents",
-              "AGENTS.md"
+              "AGENTS.md",
+              "models.allowed.yml"
             ];
             for (const req of requiredPaths) {
               if (!Array.isArray(syncManifest.managedPaths) || !syncManifest.managedPaths.includes(req)) {
                 throw new Error("Missing required managed path in .factory/template-sync.json: " + req);
               }
             }
+            if (!Array.isArray(syncManifest.preserveLocalPaths) || !syncManifest.preserveLocalPaths.includes("models.yml")) {
+              throw new Error("models.yml must be in preserveLocalPaths in .factory/template-sync.json");
+            }
             console.log("Factory config, model orchestration, and template-sync manifest invariants OK.");
           '
+
+      - name: Run Factory Python unit tests
+        run: |
+          python3 -m unittest discover tests
+          python3 tests/test_notify_grok.py
 
       - name: Run Node.js lint / test / build (if package.json exists)
         if: hashFiles('package.json') != ''

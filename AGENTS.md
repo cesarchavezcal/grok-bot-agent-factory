@@ -67,28 +67,32 @@ What [`./scripts/init.sh`](scripts/init.sh) does (idempotent, safe to re-run at 
 
 ---
 
-## 3. Pipeline Stages & Skills
+## 3. Model Configuration (`models.yml`) & Pipeline Roles
 
-| Stage | Primary Skill(s) | Active Model (`provider::model`) | Pool |
-| :--- | :--- | :--- | :--- |
-| **Phase 0: Context Scout** | Repo exploration & context brief (`<2KB`) | `antigravity::gemini-3.8-flash-low` | `AGY_FAST` |
-| **Phase 1: Discovery & Grilling** | [`wayfinder`](.agents/skills/wayfinder/SKILL.md), [`grill-with-docs`](.agents/skills/grill-with-docs/SKILL.md), [`grilling`](.agents/skills/grilling/SKILL.md), [`domain-modeling`](.agents/skills/domain-modeling/SKILL.md) | `antigravity::gemini-3.8-flash-high` | `AGY_FAST` |
-| **Phase 2: Spec & Tickets** | [`to-spec`](.agents/skills/to-spec/SKILL.md), [`to-tickets`](.agents/skills/to-tickets/SKILL.md), [`plan-epic`](.agents/skills/plan-epic/SKILL.md) | `antigravity::gemini-3.8-flash-high` | `AGY_FAST` |
-| **Phase 3a: Build (UI / CRUD / Standard)** | [`poteto-mode`](.agents/skills/poteto-mode/SKILL.md) ([`autopilot-full`](.agents/skills/poteto-mode/playbooks/autopilot-full.md)) + [`tdd`](.agents/skills/tdd/SKILL.md) | `antigravity::gemini-3.8-flash-medium` | `AGY_FAST` |
-| **Phase 3b: Build (Backend / Complex)** | [`poteto-mode`](.agents/skills/poteto-mode/SKILL.md) ([`autopilot-full`](.agents/skills/poteto-mode/playbooks/autopilot-full.md)) + [`tdd`](.agents/skills/tdd/SKILL.md) | `grok::grok-4.7-build-fast` (`reasoningEffort: medium`) | `GROK_WORK` |
-| **Phase 4a: Runtime Verification** | [`verify-app`](.agents/skills/verify-app/SKILL.md) (`verify-<app>`) | `antigravity::gemini-3.8-flash-medium` | `AGY_FAST` |
-| **Phase 4b: Independent Audit** | Adversarial diff & spec interrogation | `grok::grok-4.7` (`reasoningEffort: high`) | `GROK_AUDIT` |
-| **Rework Escalation (max 2)** | Scoped repair from 4a/4b findings | `antigravity::gemini-3.8-flash-high` (`maxRetries: 2`) | `AGY_FAST` |
+Models are not hard-coded in the factory. They are configured at the repository root in [`models.yml`](models.yml) and configured via [`./scripts/setup-models.sh`](scripts/setup-models.sh) (or `./scripts/setup-models`).
 
-### Strict Invariants
+### Roles in `models.yml`
+- **`builder`**: Drives code construction, implementation, and bug fixing (`poteto-mode` + `tdd`).
+- **`auditor`**: Performs independent adversarial interrogation and code review. **Must differ from the builder model**.
+- **`planner`**: Handles architecture discovery, spec creation, and ticket planning (`wayfinder`, `to-spec`, `grill-with-docs`). Defaults to `builder`.
+- **`epic_planner`**: Decomposes initiative-level epics into vertical sub-issues (`plan-epic`). Defaults to `builder`.
+- **`subagents`**: Powers background task subagents and auxiliary workers. Defaults to `builder`.
+
+### Allowed Models (`models.allowed.yml`)
+The factory enforces a curated allowed list in [`models.allowed.yml`](models.allowed.yml):
+- `gemini-3.8-flash-low`
+- `gemini-3.8-flash-medium`
+- `gemini-3.8-flash-high`
+- `grok-4.7`
+
+Default committed configuration: `builder: gemini-3.8-flash-high`, `auditor: grok-4.7`, with `planner`, `epic_planner`, and `subagents` defaulting to `gemini-3.8-flash-high`.
+
+### Strict Invariants & Rules
+- **Auditor Must Differ from Builder**: The setup script refuses any configuration where `auditor == builder`, and CI fails on it.
+- **Model Not Available Rule**: If a configured model is unavailable, **stop and tell the user immediately**. No fallback model, no retries.
 - **Zero Paid API Keys**: Never require or read `GEMINI_API_KEY`, `XAI_API_KEY`, `CURSOR_API_KEY`, `ANTHROPIC_API_KEY`, or `OPENAI_API_KEY`. All models run through authenticated sessions.
 - **100% Claude & GPT Free**: Never route tasks to Claude or GPT models (`disallowClaude: true`).
 - **Zero Argon Usage**: Argon models are completely retired across all orchestration.
-- **Model Separation on Audit & Rework**: Rework escalates to `antigravity::gemini-3.8-flash-high` (up to 2 attempts) so the rework builder is always a different model family from the `grok::grok-4.7` auditor.
-- **Task-Based Effort Scaling**:
-  - `low` (`gemini-3.8-flash-low`) for scout & simple tasks.
-  - `medium` (`gemini-3.8-flash-medium`) for normal work (UI/CRUD build, runtime verification).
-  - `high` (`gemini-3.8-flash-high`) for plan / spec / hard problems / rework.
 
 ---
 
@@ -115,10 +119,10 @@ Execution follows the official pstack [`poteto-mode`](.agents/skills/poteto-mode
    - Green CI (`ci`) alone **never** authorizes a merge.
    - Before merging, every PR must pass:
      - **Green CI check (`ci`)** on the current head rebased onto `main`.
-     - **Phase 4a Runtime Verification** (`antigravity::gemini-3.8-flash-medium`) running `.agents/skills/verify-app` (or `verify-<app>`) with `exitCode === 0`.
-     - **Phase 4b Independent Interrogation** (`grok::grok-4.7`, `reasoningEffort: high`, [`.cursor/agents/interrogator-grok.md`](.cursor/agents/interrogator-grok.md)) auditing the diff, spec, and verification evidence (`verdict: PASS`).
+     - **Phase 4a Runtime Verification** running `.agents/skills/verify-app` (or `verify-<app>`) with `exitCode === 0` using the configured `builder` model.
+     - **Phase 4b Independent Interrogation** using the configured `auditor` model from `models.yml` (e.g., `grok-4.7`, `reasoningEffort: high`, [`.cursor/agents/interrogator-grok.md`](.cursor/agents/interrogator-grok.md)) auditing the diff, spec, and verification evidence (`verdict: PASS`).
 3. **Rework Escalation (Up to 2 Attempts)**:
-   - If Phase 4a or Phase 4b fails, increment `retryCount` and escalate the rework pass to **`antigravity::gemini-3.8-flash-high`** (`maxRetries: 2`).
+   - If Phase 4a or Phase 4b fails, increment `retryCount` and escalate the rework pass using the configured `planner` or `builder` model (ensuring it differs from the `auditor`, `maxRetries: 2`).
    - If the ticket still fails after 2 rework attempts, set `status: "blocked"`, `waitingOn: "blocked"`, and stop for human intervention.
 4. **Squash Merge & Branch Preservation**:
    - Every PR body MUST use `Closes #N` (never `Refs #N`). For epics, the final deploy sub-issue PR also includes `Closes #EPIC`.

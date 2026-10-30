@@ -12,7 +12,7 @@ Planning-only orchestrator skill for high-level initiative tickets tagged with `
 ## Workflow Overview
 
 ```
-1. Intake & Scope Assessment (Gemini 3.8 Flash High)
+1. Intake & Scope Assessment (Configured epic_planner model from models.yml)
      ↓
 2. Architecture & Ticket Slicing (wayfinder + to-spec + to-tickets)
      ↓
@@ -42,7 +42,9 @@ Planning-only orchestrator skill for high-level initiative tickets tagged with `
 ## Phase 1: Intake & Scope Assessment
 
 - **Trigger**: Issue carries labels `epic` + `agent`.
-- **Model**: `antigravity::gemini-3.8-flash-high` (`effort: high`).
+- **Model Resolution (`models.yml`)**:
+  - Read configured `epic_planner` model from [`models.yml`](../../../models.yml).
+  - **Model Not Available Rule**: If the configured model is unavailable in the environment, **stop and tell the user immediately**. Do NOT use a fallback model, and do NOT retry.
 - Parse the epic's objectives, acceptance criteria, and background context.
 - Use [`wayfinder`](../wayfinder/SKILL.md) and [`grill-with-docs`](../grill-with-docs/SKILL.md) to locate relevant modules and align with existing architecture.
 - If genuine scope ambiguities exist:

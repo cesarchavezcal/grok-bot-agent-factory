@@ -49,7 +49,52 @@ In Linear (**Workspace Settings → Labels**), create a label named **`agent`** 
 
 ---
 
-## 2. Grok Bot Webhook Secrets (`GROK_WEBHOOK_URL` & `GROK_WEBHOOK_AUTH`)
+## 2. Model Setup & Configuration (`./scripts/setup-models.sh` & `models.yml`)
+
+The template allows users to pick their models at setup instead of hard-coding them.
+
+### Setup Script
+Run the interactive model setup script (also executed during `./scripts/init.sh`):
+
+```bash
+./scripts/setup-models.sh
+# or using the symlink:
+./scripts/setup-models
+```
+
+- **Interactive Prompts**: Prompts for the **builder** and **auditor** models from [`models.allowed.yml`](../models.allowed.yml).
+- **Defaults**: The **planner**, **epic planner**, and **sub-agents** automatically default to the builder model unless custom options are provided.
+- **Auditor Invariant**: The auditor model **MUST differ from the builder model**. If the same model is selected, the script refuses it, and CI fails.
+- **Re-running**: To change models at any time, simply **re-run `./scripts/setup-models.sh`**.
+- **CLI Flags**: For automation or scripts, flags are supported:
+  ```bash
+  ./scripts/setup-models.sh --builder gemini-3.8-flash-high --auditor grok-4.7
+  ./scripts/setup-models.sh --defaults
+  ```
+
+### Roles in `models.yml`
+The answers are written to [`models.yml`](../models.yml) at the repository root:
+- `builder`: Standard code generation, implementation, and bug fixing.
+- `auditor`: Adversarial code review and interrogation. Must differ from builder.
+- `planner`: Planning, spec generation, and grilling.
+- `epic_planner`: Initiative epic breakdown.
+- `subagents`: Auxiliary background agents.
+
+### Allowed Models List (`models.allowed.yml`)
+The setup script and CI checks only permit models declared in [`models.allowed.yml`](../models.allowed.yml):
+- `gemini-3.8-flash-low`
+- `gemini-3.8-flash-medium`
+- `gemini-3.8-flash-high`
+- `grok-4.7`
+
+*(Argon, Claude, and GPT models are strictly forbidden.)*
+
+### Model Unavailability Rule
+If a configured model is unavailable in the environment, the factory **stops immediately and tells the user**. There is no fallback model and no retries.
+
+---
+
+## 3. Grok Bot Webhook Secrets (`GROK_WEBHOOK_URL` & `GROK_WEBHOOK_AUTH`)
 
 `.github/workflows/notify-grok.yml` triggers on `issues` (`types: [labeled]`) and runs only when `github.event.label.name == 'agent'`:
 - When an issue is **created with labels** (e.g., via the `.github/ISSUE_TEMPLATE/bug.yml` issue form), GitHub emits a `labeled` event for each initial label, so exactly one run dispatches when `agent` is processed.
@@ -82,7 +127,7 @@ If either `GROK_WEBHOOK_URL` or `GROK_WEBHOOK_AUTH` is not configured when an is
 
 ---
 
-## 3. Allow Auto-Merge, Squash Merge & Preserve Branches
+## 4. Allow Auto-Merge, Squash Merge & Preserve Branches
 
 The `Autopilot-full` playbook merges PRs via **squash merge** once both the **`ci`** status check and independent verification (`verify-app` + Grok 4.7 interrogation) pass. Branches are preserved (`delete_branch_on_merge=false`). Every PR body uses `Closes #N` (never `Refs #N`) so the issue closes when the PR merges, and for epics the last (deploy) sub-issue PR also includes `Closes #EPIC`.
 
@@ -99,7 +144,7 @@ gh api --method PATCH "repos/$REPO" \
 
 ---
 
-## 4. Branch Protection on `main` (Required Check: `ci`)
+## 5. Branch Protection on `main` (Required Check: `ci`)
 
 `.github/workflows/ci.yml` defines a job with the stable check name **`ci`**.
 
@@ -133,7 +178,7 @@ gh repo edit "$REPO" --visibility public --accept-visibility-change-consequences
 
 ---
 
-## 5. App Verification Skill (`.agents/skills/verify-app`)
+## 6. App Verification Skill (`.agents/skills/verify-app`)
 
 Before running autonomous merges on a new application:
 1. Customize `.agents/skills/verify-app/SKILL.md` (or copy it to `.agents/skills/verify-<app>/SKILL.md` and update `"verifySkill"` in `.factory/config.json`).
@@ -141,7 +186,7 @@ Before running autonomous merges on a new application:
 
 ---
 
-## 6. Syncing Upstream Template Updates (`./scripts/sync-template.sh`)
+## 7. Syncing Upstream Template Updates (`./scripts/sync-template.sh`)
 
 Derived working repositories can pull factory infrastructure updates from the private template (`cesarchavezcal/grok-bot-agent-factory`) at any time without touching application code:
 
@@ -168,21 +213,22 @@ Derived working repositories can pull factory infrastructure updates from the pr
    - `.factory/template-sync.json`
    - `.github/workflows/*`
    - `.github/ISSUE_TEMPLATE/*`
-   - `scripts/*` (including `scripts/sync-template.sh`, `scripts/init.sh`, and `scripts/setup-labels.sh`)
+   - `scripts/*` (including `scripts/sync-template.sh`, `scripts/init.sh`, `scripts/setup-labels.sh`, `scripts/setup-models.sh`)
    - `.agents/skills/*`
    - `.cursor/rules`
    - `.cursor/agents`
    - `AGENTS.md`
    - `skills-lock.json`
+   - `models.allowed.yml`
    - `.factory/work-item.schema.json`
    - `.factory/WORK-ITEM.example.json`
-4. **Never Touches App Code**: Application source files, `.factory/config.json` (which stores the working repo's `app` slug and `verifySkill`), `.factory/work-items`, and `.agents/skills/verify-app/features` are preserved.
+4. **Never Touches App Code or Custom Models**: Application source files, `models.yml`, `.factory/config.json` (which stores the working repo's `app` slug and `verifySkill`), `.factory/work-items`, and `.agents/skills/verify-app/features` are preserved.
 5. **Idempotent**: If no managed files changed, it prints an up-to-date message and exits `0` without creating a branch or opening a PR.
 6. **Version Tracking (`.factory/template-version`)**: When managed files change, it records the synced 40-character template commit SHA in `.factory/template-version`, prints a diff summary, pushes `chore/template-sync-<short-sha>`, and opens (or updates) a Pull Request against `main`.
 
 ---
 
-## 7. Troubleshooting
+## 8. Troubleshooting
 
 Common issues and their resolutions:
 

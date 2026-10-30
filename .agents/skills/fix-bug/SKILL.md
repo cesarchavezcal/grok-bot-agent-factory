@@ -17,14 +17,14 @@ High-level bug fixing skill for autonomous defect triage, reproduction-first dia
 2. Reproduce First (Hard Gate)
      ├─ Cannot reproduce or open questions? → STOP immediately. Write in thread final message (NEVER comment on issue).
      └─ Reproduced & no questions! → Write "No questions, starting build" and proceed immediately to Phase 3.
-3. Write Failing Test (Red Phase via tdd)
+3. Write Failing Test (Red Phase via tdd using configured builder model)
      ↓
 4. Root Cause Fix (ce-debug + principle-fix-root-causes)
      ↓
 5. Verification: All tests pass + run the application once
      ↓
-6. Independent Audit (Grok 4.7 High: GROK_AUDIT)
-     ↓ (If audit fails: rework with Gemini 3.8 Flash High, max 2 retries)
+6. Independent Audit (Configured auditor model from models.yml, must differ from builder)
+     ↓ (If audit fails: rework with builder/planner distinct from auditor, max 2 retries)
 7. PR & Squash Merge (Closes #N; green CI 'ci' + audit PASS; gh pr merge --squash without --delete-branch)
      ↓
 8. Deploy Check (Deploy only if issue carries 'deploy' label, after green merge)
@@ -36,6 +36,9 @@ High-level bug fixing skill for autonomous defect triage, reproduction-first dia
 
 - **Trigger**: Issue carries labels `bug` + `agent` (and does NOT carry `epic`).
   - *Precedence Rule*: If an issue carries `epic` + `bug` + `agent`, **`plan-epic` takes precedence**.
+- **Model Resolution (`models.yml`)**:
+  - Read configured models from [`models.yml`](../../../models.yml).
+  - **Model Not Available Rule**: If any required model is unavailable in the environment, **stop and tell the user immediately**. Do NOT use a fallback model, and do NOT retry.
 - **Plan-Then-Build Protocol**:
   - Every issue thread starts with a short plan directly in the thread (reproduction approach, files to inspect/modify, tests to author, verification).
 - **GitHub Account & Identity Invariant**:
@@ -112,12 +115,12 @@ Enforce root-cause engineering discipline directly in the fix:
 
 ## Phase 6: Independent Audit & Rework
 
-1. **Grok 4.7 Audit**:
-   - Model: `grok::grok-4.7` (`reasoningEffort: high`, `GROK_AUDIT`).
+1. **Independent Audit**:
+   - Model: Read `auditor` from [`models.yml`](../../../models.yml).
+   - Invariant: Auditor MUST differ from the builder model.
    - Audit verifies that the fix addresses the true root cause rather than applying a symptom patch, and that the reproduction test proves correctness.
 2. **Rework Rule**:
-   - If audit fails, rework is assigned to **`antigravity::gemini-3.8-flash-high`** (effort: high).
-   - Rework builder is strictly from a different model family from the Grok auditor.
+   - If audit fails, rework is assigned to the configured `planner` or `builder` model, strictly distinct from the `auditor`.
    - **Max Retries**: Exactly **2 rework attempts** (`maxRetries: 2`). If still unresolved after 2 attempts, stop immediately and report the blocker in the thread final message.
 
 ---

@@ -27,7 +27,8 @@ cd <name>
 3. Creates/updates GitHub repository labels (`agent`, `epic`, `deploy`, `bug`, etc.) via [`./scripts/setup-labels.sh`](scripts/setup-labels.sh).
 4. Configures GitHub merge policy via `gh api PATCH` (`allow_auto_merge=true`, `allow_squash_merge=true`, `delete_branch_on_merge=false`) and **Branch protection on `main`** via `gh api PUT` with the required status check **`ci`**. If a repository is private on GitHub Free (`403 / upgrade`), it emits a clear, explicit warning instead of failing silently.
 5. Checks `gh secret list` for `GROK_WEBHOOK_URL` and `GROK_WEBHOOK_AUTH`, interactively running `gh secret set` (hidden input) for any missing secret when a TTY is present, or printing a clear reminder without failing if skipped or run non-interactively.
-6. Updates the project slug in [`.factory/config.json`](.factory/config.json) and prints the optional T3 Code project registration command.
+6. Verifies/sets up model choices in [`models.yml`](models.yml) using [`./scripts/setup-models.sh`](scripts/setup-models.sh) from [`models.allowed.yml`](models.allowed.yml).
+7. Updates the project slug in [`.factory/config.json`](.factory/config.json) and prints the optional T3 Code project registration command.
 
 See [`docs/setup.md`](docs/setup.md) for manual GitHub/Linear setup details and [`AGENTS.md`](AGENTS.md) for the complete agent operating contract.
 
@@ -75,23 +76,31 @@ Inside any working repository derived from this template (or from a template che
 
 ---
 
-## Model Orchestration (Zero API Keys, Zero Claude, Zero Argon)
+## Model Configuration & Setup (`models.yml`)
 
-| Role | Provider & Model | Pool | Notes |
-| :--- | :--- | :--- | :--- |
-| **Context Scout** | `antigravity::gemini-3.8-flash-low` | `AGY_FAST` | Fast repo scout & context brief (`<2KB`), low effort |
-| **Spec & Plan** | `antigravity::gemini-3.8-flash-high` | `AGY_FAST` | `wayfinder`, `grill-with-docs`, `to-spec`, `plan-epic`, high effort |
-| **Build (UI / CRUD)** | `antigravity::gemini-3.8-flash-medium` | `AGY_FAST` | Standard UI, CRUD, frontend, docs slices, medium effort |
-| **Build (Backend)** | `grok::grok-4.7-build-fast` | `GROK_WORK` | DB, SQL, concurrency, security, state machines (`reasoningEffort: medium`) |
-| **Runtime Verify** | `antigravity::gemini-3.8-flash-medium` | `AGY_FAST` | Drives `.agents/skills/verify-app` (`exitCode: 0`), medium effort |
-| **Adversarial Audit** | `grok::grok-4.7` (`reasoningEffort: high`) | `GROK_AUDIT` | Independent read-only diff & spec interrogation |
-| **Rework Escalation** | `antigravity::gemini-3.8-flash-high` | `AGY_FAST` | Up to **2 attempts** (`maxRetries: 2`), distinct from Grok auditor, high effort |
+The template lets users pick their models at setup via [`./scripts/setup-models.sh`](scripts/setup-models.sh) (or `./scripts/setup-models`). Choices are stored in [`models.yml`](models.yml) at the repo root:
 
-### Gemini Flash Effort Rule
-Gemini Flash effort is chosen strictly according to task complexity:
-- **`low`** (`gemini-3.8-flash-low`): Scout & simple exploratory tasks (Phase 0 Context Scout).
-- **`medium`** (`gemini-3.8-flash-medium`): Normal work including standard UI/CRUD builds (Phase 3a) and runtime verification (Phase 4a).
-- **`high`** (`gemini-3.8-flash-high`): High-complexity problems including discovery & grilling (Phase 1), spec & ticket breakdown (Phase 2), and rework escalation passes.
+- **`builder`**: Implementation, testing, and bug fixing.
+- **`auditor`**: Independent adversarial code interrogation. **Must differ from builder**.
+- **`planner`**: Architecture discovery, spec generation, and grilling (defaults to `builder`).
+- **`epic_planner`**: Initiative epic breakdown into vertical sub-issues (defaults to `builder`).
+- **`subagents`**: Auxiliary subagents and background workers (defaults to `builder`).
+
+### Allowed Models List (`models.allowed.yml`)
+The setup script and CI checks only permit models declared in [`models.allowed.yml`](models.allowed.yml):
+- `gemini-3.8-flash-low`
+- `gemini-3.8-flash-medium`
+- `gemini-3.8-flash-high`
+- `grok-4.7`
+
+Committed defaults: `builder: gemini-3.8-flash-high`, `auditor: grok-4.7`, and `planner`, `epic_planner`, `subagents` defaulting to `gemini-3.8-flash-high`.
+
+### Strict Invariants
+- **Auditor Must Differ from Builder**: The script refuses identical models, and CI check fails on it.
+- **Model Not Available Rule**: If a configured model is unavailable, the factory **stops immediately and informs the user**. No fallback models, no retries.
+- **Zero Paid API Keys**: Never requires paid keys (`GEMINI_API_KEY`, `XAI_API_KEY`, `CURSOR_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`).
+- **100% Claude & GPT Free**: Never routes to Claude or GPT models (`disallowClaude: true`).
+- **Zero Argon Usage**: Argon models are completely retired.
 
 ---
 
@@ -101,6 +110,8 @@ Gemini Flash effort is chosen strictly according to task complexity:
 .
 ├── AGENTS.md                                    # Agent operating contract & pipeline rules
 ├── README.md                                    # Overview & quick start
+├── models.allowed.yml                           # Allowed model list for the template
+├── models.yml                                   # Configured roles to model mappings
 ├── skills-lock.json                             # Locked official skills (mattpocock/skills + pstack)
 ├── .agents/skills/                              # Official skills + orchestrators + verify-app template
 │   ├── implement-ticket/                        # High-level feature orchestrator skill
@@ -131,9 +142,16 @@ Gemini Flash effort is chosen strictly according to task complexity:
 │   └── workflows/
 │       ├── ci.yml                               # Generic CI workflow (stable check name: `ci`)
 │       └── notify-grok.yml                      # Dispatches `agent`-labeled issues to Grok Bot webhook
-├── docs/setup.md                                # Branch protection, auto-merge, secrets, labels & sync guide
-└── scripts/
-    ├── init.sh                                  # Idempotent `template init` bootstrap script
-    ├── setup-labels.sh                          # Idempotent GitHub labels script (+ Linear note)
-    └── sync-template.sh                         # Idempotent upstream template sync & PR script
+├── docs/setup.md                                # Setup, models, branch protection, auto-merge & sync guide
+├── scripts/
+│   ├── init.sh                                  # Idempotent `template init` bootstrap script
+│   ├── setup-labels.sh                          # Idempotent GitHub labels script (+ Linear note)
+│   ├── setup-models.sh                          # Model setup script (writes models.yml)
+│   ├── setup-models                             # Executable symlink to setup-models.sh
+│   ├── sync-template.sh                         # Idempotent upstream template sync & PR script
+│   ├── validate_models.py                       # Validates models.yml against models.allowed.yml
+│   └── validate-models.py                       # Executable symlink to validate_models.py
+└── tests/
+    ├── test_models.py                           # Tests for models.yml validation & CLI setup
+    └── test_notify_grok.py                      # Tests for webhook payload & duplicate prevention
 ```
