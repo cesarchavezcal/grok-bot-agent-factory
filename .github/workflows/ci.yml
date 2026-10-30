@@ -102,8 +102,6 @@ jobs:
       - name: Run Factory Python unit tests
         run: |
           python3 -m unittest discover tests
-          python3 tests/test_notify_grok.py
-          python3 tests/test_sync_template.py
 
       - name: Run Node.js lint / test / build (if package.json exists)
         if: hashFiles('package.json') != ''
