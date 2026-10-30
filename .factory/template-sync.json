@@ -13,11 +13,13 @@
     "AGENTS.md",
     "skills-lock.json",
     ".factory/work-item.schema.json",
-    ".factory/WORK-ITEM.example.json"
+    ".factory/WORK-ITEM.example.json",
+    "models.allowed.yml"
   ],
   "preserveLocalPaths": [
     ".factory/config.json",
     ".factory/work-items",
-    ".agents/skills/verify-app/features"
+    ".agents/skills/verify-app/features",
+    "models.yml"
   ]
 }

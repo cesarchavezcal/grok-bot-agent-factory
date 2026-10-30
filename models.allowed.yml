@@ -1,0 +1,8 @@
+# Allowed models for Grok Bot Agent Factory
+# Only models listed here may be used in models.yml.
+# Argon, Claude, and GPT models are strictly forbidden.
+models:
+  - gemini-3.8-flash-low
+  - gemini-3.8-flash-medium
+  - gemini-3.8-flash-high
+  - grok-4.7

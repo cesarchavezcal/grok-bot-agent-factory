@@ -56,7 +56,7 @@
     "builderStandard": {
       "pool": "AGY_FAST",
       "providerInstanceId": "antigravity",
-      "model": "gemini-3.8-flash-medium",
+      "model": "gemini-3.8-flash-high",
       "fallback": "grok-4.7-build-fast",
       "scope": ["ui", "crud", "frontend", "docs", "chore"],
       "role": "implementation"

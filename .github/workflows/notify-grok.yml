@@ -18,6 +18,9 @@ jobs:
       cancel-in-progress: false
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Send issue event to Grok Bot webhook
         env:
           URL: ${{ secrets.GROK_WEBHOOK_URL }}
@@ -29,12 +32,15 @@ jobs:
             echo "::notice::Skipping Grok webhook notification: GROK_WEBHOOK_URL or GROK_WEBHOOK_AUTH secret is not set."
             exit 0
           fi
+          python3 scripts/validate_models.py
           IDEMPOTENCY_KEY="${{ github.repository }}#${{ github.event.issue.number }}"
           DELIVERY_ID="${{ github.event.issue.number }}-${RUN_ID}-${RUN_ATTEMPT}"
+          MODELS_JSON="$(python3 -c "import yaml, json; print(json.dumps(yaml.safe_load(open('models.yml'))))")"
           jq --arg idempotency_key "$IDEMPOTENCY_KEY" \
              --arg delivery_id "$DELIVERY_ID" \
              --arg run_id "$RUN_ID" \
-             '.idempotency_key = $idempotency_key | .delivery_id = $delivery_id | .run_id = $run_id | .labels = [(.issue.labels // [])[].name]' \
+             --argjson models "$MODELS_JSON" \
+             '.idempotency_key = $idempotency_key | .delivery_id = $delivery_id | .run_id = $run_id | .labels = [(.issue.labels // [])[].name] | .models = $models' \
              "$GITHUB_EVENT_PATH" | curl -fsS -X POST "$URL" \
             -H "Authorization: $AUTH" \
             -H "Content-Type: application/json" \

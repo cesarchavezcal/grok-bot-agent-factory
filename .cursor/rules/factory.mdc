@@ -51,22 +51,20 @@ This repository follows the **Grok Bot Agent Factory** autonomous workflow. Read
 - **Max Concurrency**: `3` isolated Git worktrees off `main` in parallel (never stacked).
 - **Proof & Merge Gate**:
   1. Green CI check (`ci`).
-  2. Independent runtime verification via `.agents/skills/verify-app` (or `verify-<app>`) with `exitCode === 0`.
-  3. Independent cross-model adversarial interrogation on `grok::grok-4.7` (`reasoningEffort: "high"`) returning `PASS`.
+  2. Independent runtime verification via `.agents/skills/verify-app` (or `verify-<app>`) with `exitCode === 0` using the configured `builder` model.
+  3. Independent cross-model adversarial interrogation using the configured `auditor` model from `models.yml` (e.g. `grok-4.7`, `reasoningEffort: "high"`) returning `PASS`.
 - **Squash Merge (Never Delete Branches)**:
   - Merge using `gh pr merge <PR_NUMBER> --squash`.
   - **Strict Rule**: NEVER pass `--delete-branch`. Never delete branches.
 
-## 5. Model Routing & Rework Escalation (Zero API Keys, Zero Claude, Zero Argon)
-- **Scout**: `antigravity::gemini-3.8-flash-low` (`AGY_FAST`, low effort).
-- **Spec & Plan**: `antigravity::gemini-3.8-flash-high` (`AGY_FAST`, high effort).
-- **UI / CRUD / Standard Build**: `antigravity::gemini-3.8-flash-medium` (`AGY_FAST`, medium effort).
-- **Backend / Complex Logic Build** (`db`, `sql`, `concurrency`, `security`, `algorithm`, `state-machine`, `architecture`): `grok-4.7-build-fast` (`GROK_WORK`, `reasoningEffort: medium`).
-- **Runtime Verify**: `antigravity::gemini-3.8-flash-medium` (`AGY_FAST`, medium effort).
-- **Independent Audit / Interrogation**: `grok::grok-4.7` (`GROK_AUDIT`, `reasoningEffort: "high"`).
-- **Rework Escalation**: On verification or audit failure, escalate rework to **`antigravity::gemini-3.8-flash-high`** (`AGY_FAST`, high effort) — strictly distinct from the `grok-4.7` auditor — for a maximum of **2 attempts** (`maxRetries: 2`). Stop and block if still failing after 2 attempts.
-- **Task-Based Effort Scaling**:
-  - `low` (`gemini-3.8-flash-low`): scout / simple tasks.
-  - `medium` (`gemini-3.8-flash-medium`): normal build / verification.
-  - `high` (`gemini-3.8-flash-high`): plan / spec / hard build / rework.
+## 5. Model Configuration (`models.yml`) & Invariants (Zero API Keys, Zero Claude, Zero Argon)
+- **Dynamic Model Configuration**: All models are configured in `models.yml` at the repo root and managed via `./scripts/setup-models.sh`:
+  - `builder`: Implementation, bug fixing, and verification.
+  - `auditor`: Adversarial code review and interrogation. **Must differ from builder**.
+  - `planner`: Architecture discovery, specification, and ticket planning.
+  - `epic_planner`: Decomposition of initiative epics into vertical sub-issues.
+  - `subagents`: Background subagents and auxiliary workers.
+- **Allowed Models (`models.allowed.yml`)**: Allowed options are `gemini-3.8-flash-low`, `gemini-3.8-flash-medium`, `gemini-3.8-flash-high`, and `grok-4.7`.
+- **Model Not Available Rule**: If a configured model is unavailable, **stop and tell the user immediately**. No fallback model, no retries.
+- **Rework Escalation**: On verification or audit failure, escalate rework using the configured `planner` or `builder` model — strictly distinct from the `auditor` — for a maximum of **2 attempts** (`maxRetries: 2`). Stop and block if still failing after 2 attempts.
 - **Invariants**: Never use Claude or GPT models (`disallowClaude: true`), never use Argon models (retired), and never require paid API keys (`strictZeroCost: true`).

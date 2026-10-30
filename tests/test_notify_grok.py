@@ -33,7 +33,11 @@ def test_workflow_structure():
     step_names = [s.get("name", "") for s in steps]
     assert "Deduplicate initial creation burst" not in step_names, "Flaky deduplicate step must be removed"
 
-    # 5. Send step must build stable idempotency_key repo#issue
+    # 5. Checkout step must exist to read models.yml
+    checkout_step = next((s for s in steps if "Checkout repository" in s.get("name", "")), None)
+    assert checkout_step is not None, "Checkout repository step must exist"
+
+    # 6. Send step must build stable idempotency_key repo#issue and pass models
     send_step = next((s for s in steps if "Send issue event to Grok Bot webhook" in s.get("name", "")), None)
     assert send_step is not None, "Send step must exist"
     run_script = send_step.get("run", "")
@@ -41,6 +45,9 @@ def test_workflow_structure():
     assert "idempotency_key" in run_script, "Must pass idempotency_key to jq"
     assert "delivery_id" in run_script, "Must keep delivery_id in jq"
     assert "labels" in run_script, "Must keep labels in jq"
+    assert "models" in run_script, "Must pass models to jq"
+    assert "models.yml" in run_script, "Must read models.yml"
+    assert "validate_models.py" in run_script, "Must validate models.yml before dispatching webhook"
 
 def simulate_event(workflow_types, job_if_expr, action, label_name, issue_labels):
     # Simulates GitHub Actions intake logic
@@ -75,16 +82,18 @@ def test_simulation_reproduction():
     assert len(dispatches) == 1, f"Expected exactly 1 dispatch on issue creation with 'agent', but got {len(dispatches)}: {dispatches}"
 
 def test_jq_payload_transformation():
-    sample_event = '{"issue":{"number":42,"labels":[{"name":"bug"},{"name":"agent"}]}}'
+    sample_event = '{\"issue\":{\"number\":42,\"labels\":[{\"name\":\"bug\"},{\"name\":\"agent\"}]}}'
     idempotency_key = "cesarchavezcal/grok-bot-agent-factory#42"
     delivery_id = "42-12345-1"
     run_id = "12345"
+    models_json = '{"builder":"gemini-3.8-flash-high","auditor":"grok-4.7","planner":"gemini-3.8-flash-high","epic_planner":"gemini-3.8-flash-high","subagents":"gemini-3.8-flash-high"}'
     cmd = [
         "jq",
         "--arg", "idempotency_key", idempotency_key,
         "--arg", "delivery_id", delivery_id,
         "--arg", "run_id", run_id,
-        '.idempotency_key = $idempotency_key | .delivery_id = $delivery_id | .run_id = $run_id | .labels = [(.issue.labels // [])[].name]'
+        "--argjson", "models", models_json,
+        '.idempotency_key = $idempotency_key | .delivery_id = $delivery_id | .run_id = $run_id | .labels = [(.issue.labels // [])[].name] | .models = $models'
     ]
     res = subprocess.run(cmd, input=sample_event, text=True, capture_output=True, check=True)
     import json
@@ -93,6 +102,8 @@ def test_jq_payload_transformation():
     assert out["delivery_id"] == delivery_id
     assert out["run_id"] == run_id
     assert out["labels"] == ["bug", "agent"]
+    assert out["models"]["builder"] == "gemini-3.8-flash-high"
+    assert out["models"]["auditor"] == "grok-4.7"
 
 if __name__ == "__main__":
     print("Running test_workflow_structure...")

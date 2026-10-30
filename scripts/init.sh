@@ -236,10 +236,26 @@ else
 fi
 
 # ------------------------------------------------------------------------------
-# 6. T3 Code registration & .factory/config.json summary
+# 6. Model configuration check (models.yml)
 # ------------------------------------------------------------------------------
 echo ""
-echo "🧭 [6/6] Project registration & factory config check..."
+echo "🤖 [6/7] Checking model configuration (models.yml)..."
+
+if [ ! -f "models.yml" ]; then
+  if [ -t 0 ] && [ -t 1 ]; then
+    bash "$ROOT_DIR/scripts/setup-models.sh"
+  else
+    bash "$ROOT_DIR/scripts/setup-models.sh" --defaults
+  fi
+else
+  python3 "$ROOT_DIR/scripts/validate-models.py"
+fi
+
+# ------------------------------------------------------------------------------
+# 7. T3 Code registration & .factory/config.json summary
+# ------------------------------------------------------------------------------
+echo ""
+echo "🧭 [7/7] Project registration & factory config check..."
 
 APP_NAME="$(basename "$ROOT_DIR")"
 if [ -f ".factory/config.json" ]; then

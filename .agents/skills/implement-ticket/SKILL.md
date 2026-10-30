@@ -12,16 +12,16 @@ High-level orchestrator skill designed for autonomous feature tickets and issue-
 ## Workflow Overview
 
 ```
-1. Intake & Context Scout (Gemini 3.8 Flash Low)
+1. Intake & Context Scout (Configured builder or subagents model)
      ↓
-2. Planning & Grilling (Gemini 3.8 Flash High: plan in thread; questions? stop & ask; no questions? build immediately)
+2. Planning & Grilling (Configured planner model from models.yml: plan in thread; questions? stop & ask; no questions? build immediately)
      ↓
-3. Build (Gemini 3.8 Flash Medium / Grok 4.7 Fast: poteto-mode + tdd)
+3. Build (Configured builder model from models.yml: poteto-mode + tdd)
      ↓
-4. Verification (Gemini 3.8 Flash Medium: verify-app)
+4. Verification (Configured builder model: verify-app)
      ↓
-5. Independent Adversarial Audit (Grok 4.7 High: GROK_AUDIT)
-     ↓ (If audit fails: rework with Gemini 3.8 Flash High, max 2 retries)
+5. Independent Adversarial Audit (Configured auditor model from models.yml, must differ from builder)
+     ↓ (If audit fails: rework with planner or builder model distinct from auditor, max 2 retries)
 6. PR & Squash Merge (Closes #N; green CI 'ci' + audit PASS; gh pr merge --squash without --delete-branch)
      ↓
 7. Deploy Check (Deploy ONLY if issue has 'deploy' label, after green merge)
@@ -33,7 +33,9 @@ High-level orchestrator skill designed for autonomous feature tickets and issue-
 
 - **Trigger**: Issue carries the `agent` label (and does not carry `bug` or `epic`).
   - *Precedence Rule*: `epic` takes highest precedence (routes to `plan-epic`), followed by `bug` (routes to `fix-bug`).
-- **Scout Model**: `antigravity::gemini-3.8-flash-low` (`effort: low`).
+- **Model Resolution (`models.yml`)**:
+  - Read configured models from [`models.yml`](../../../models.yml).
+  - **Model Not Available Rule**: If any required model is unavailable in the environment, **stop and tell the user immediately**. Do NOT use a fallback model, and do NOT retry.
 - **GitHub Account Invariant**:
   - Every commit, push, and PR must use the GitHub account `cesarchavezcal`.
   - Check `gh auth status` first before any push or `gh` command; if not `cesarchavezcal`, remember the active account, switch with `gh auth switch --user cesarchavezcal`, and switch back when done.
@@ -46,7 +48,7 @@ High-level orchestrator skill designed for autonomous feature tickets and issue-
 
 ## Phase 2: Planning & Grilling (Plan-Then-Build Protocol)
 
-- **Planner Model**: `antigravity::gemini-3.8-flash-high` (`effort: high`).
+- **Planner Model**: Read `planner` from [`models.yml`](../../../models.yml).
 - **Skills**:
   - [`wayfinder`](../wayfinder/SKILL.md): Locate key seams, interfaces, and architecture boundaries.
   - [`grill-with-docs`](../grill-with-docs/SKILL.md): Challenge proposed changes against existing architecture, domain models, and ADRs.
@@ -67,9 +69,7 @@ High-level orchestrator skill designed for autonomous feature tickets and issue-
 
 ## Phase 3: Build (`poteto-mode` + `tdd`)
 
-- **Builder Models**:
-  - Standard UI / CRUD / Frontend: `antigravity::gemini-3.8-flash-medium` (`effort: medium`).
-  - Complex Backend / DB / Concurrency: `grok::grok-4.7-build-fast` (`reasoningEffort: medium`).
+- **Builder Model**: Read `builder` from [`models.yml`](../../../models.yml). Sub-agents use `subagents` from `models.yml`.
 - **Discipline**:
   - Follow official [`poteto-mode`](../poteto-mode/SKILL.md) under the `autopilot-full` playbook:
     - **Reproduce / Benchmark**: Verify current baseline state.
@@ -82,16 +82,16 @@ High-level orchestrator skill designed for autonomous feature tickets and issue-
 ## Phase 4: Runtime Verification & Independent Audit
 
 1. **Runtime Verification**:
-   - Model: `antigravity::gemini-3.8-flash-medium` (`effort: medium`).
+   - Model: Configured `builder` model.
    - Run the application verification suite ([`verify-app`](../verify-app/SKILL.md) / `verify-<app>`).
    - Verify all unit, integration, and runtime checks pass cleanly (`exitCode === 0`).
 2. **Adversarial Audit**:
-   - Model: `grok::grok-4.7` (`reasoningEffort: high`, `GROK_AUDIT`).
+   - Model: Read `auditor` from [`models.yml`](../../../models.yml).
+   - Invariant: Auditor MUST differ from builder.
    - Read-only independent audit of diff, spec adherence, security implications, and edge cases.
 3. **Rework Rule**:
-   - If verification fails or Grok returns findings:
-     - Escalate rework to **`antigravity::gemini-3.8-flash-high`** (effort: high).
-     - **Invariant**: The rework model is ALWAYS from a different family than the auditor (`grok-4.7`).
+   - If verification fails or audit returns findings:
+     - Escalate rework using configured `planner` or `builder` model distinct from `auditor`.
      - Maximum 2 rework attempts (`maxRetries: 2`).
      - If still unresolved after 2 retries, stop and report blocker in the thread final message.
 
