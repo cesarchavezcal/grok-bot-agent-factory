@@ -1,0 +1,48 @@
+name: Evaluate Run (Outer Loop)
+run-name: "evaluate-run #${{ github.event.pull_request.number }}"
+
+on:
+  pull_request:
+    types: [closed]
+    branches: ["main"]
+
+permissions:
+  contents: write
+  pull-requests: read
+  issues: write
+
+jobs:
+  evaluate:
+    name: evaluate-run
+    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'agent')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run Evaluator
+        id: run_eval
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          python3 scripts/evaluate_run.py --pr-number "$PR_NUMBER" --pr-url "$PR_URL"
+
+      - name: Commit and push updated memory store
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .factory/memory/ || true
+          if git diff --staged --quiet; then
+            echo "No memory store changes to commit."
+          else
+            git commit -m "chore(memory): record lessons from PR #${{ github.event.pull_request.number }}"
+            git push origin main
+          fi

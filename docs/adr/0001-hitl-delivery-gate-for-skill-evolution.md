@@ -1,0 +1,3 @@
+# 0001: Human-in-the-Loop Delivery Gate for Self-Evolving Skills
+
+While ordinary ticket and bug PRs auto-merge upon green CI and passing Grok audit, all self-evolution pull requests that modify `.agents/skills/` or `AGENTS.md` strictly require human review and manual merge. Autonomous modification of the factory's own prompts and operating constraints presents an unconstrained risk of prompt drift, recursive degradation, and safety regression; requiring an explicit Receipt of Causality and human sign-off preserves human oversight over the control plane without slowing down daily code throughput.

@@ -131,3 +131,25 @@ Execution follows the official pstack [`poteto-mode`](.agents/skills/poteto-mode
      gh pr merge <PR_NUMBER> --squash
      ```
    - **Strict Rule**: NEVER pass `--delete-branch`. Never delete branches.
+
+---
+
+## 6. Self-Improvement Outer Loop (Memory Store, Evaluator & Routine Maker)
+
+Beyond the inner task execution loop, the factory runs an asynchronous evaluative outer loop that extracts lessons from completed runs and iteratively improves `.agents/skills/`:
+
+1. **Post-Merge Evaluation (`.github/workflows/evaluate-run.yml`)**:
+   - Triggers automatically upon merge of any `agent`-labeled PR to `main`.
+   - Runs `scripts/evaluate_run.py` to inspect diff economy, rework retry counts, verification outcomes, and audit logs.
+   - Extracts structured lessons matching [`.factory/schemas/lesson.schema.json`](.factory/schemas/lesson.schema.json).
+2. **Process-Safe Memory Store (`.factory/memory/`)**:
+   - Atomically appends lessons to `.factory/memory/lessons.jsonl` and updates the aggregated pattern index in `.factory/memory/patterns.json`.
+   - Uses POSIX `fcntl.flock(LOCK_EX)` on `.factory/memory/.memory.lock` across concurrent worktrees (`git rev-parse --git-common-dir`).
+   - `.gitattributes` enforces `merge=union` on `lessons.jsonl` to ensure parallel branch merges preserve all lesson records without merge conflicts.
+3. **Threshold-Triggered Routine Maker (`gemini-3.8-flash-high`)**:
+   - When a failure pattern accumulates $\ge 3$ occurrences, `patterns.json` flags `readyForRoutineMaker: true`.
+   - The Routine Maker ([`.cursor/agents/routine-maker.md`](.cursor/agents/routine-maker.md)) authors a minimal diff modifying the target skill or rule.
+4. **HITL Delivery Gate (ADR 0001)**:
+   - Self-evolution PRs strictly require human approval (`cesarchavezcal`) and MUST NOT auto-merge.
+   - Every self-evolution PR must include a structured **Receipt of Causality** citing the contributing lesson IDs, repetition counts, and expected behavioral changes.
+

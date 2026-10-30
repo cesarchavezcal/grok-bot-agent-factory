@@ -133,18 +133,27 @@ Committed defaults: `builder: gemini-3.8-flash-high`, `auditor: grok-4.7`, and `
 │   ├── config.json                              # Generic factory & model routing configuration
 │   ├── template-sync.json                       # Explicit manifest of managed template sync paths
 │   ├── template-version                         # Synced template commit SHA
+│   ├── schemas/                                 # Schemas (lesson.schema.json, patterns.schema.json)
 │   ├── work-item.schema.json                    # Work-item JSON schema
 │   ├── WORK-ITEM.example.json                   # Work-item example
+│   ├── memory/                                  # Persistent memory store (lessons.jsonl, patterns.json)
 │   └── work-items/.gitkeep                      # Runtime work-items directory
 ├── .github/
 │   ├── ISSUE_TEMPLATE/                          # Issue forms (bug.yml, feature.md, config.yml)
 │   ├── PULL_REQUEST_TEMPLATE.md                 # Generic PR receipt template
 │   └── workflows/
 │       ├── ci.yml                               # Generic CI workflow (stable check name: `ci`)
+│       ├── evaluate-run.yml                     # Outer loop post-merge evaluation workflow
 │       └── notify-grok.yml                      # Dispatches `agent`-labeled issues to Grok Bot webhook
-├── docs/setup.md                                # Setup, models, branch protection, auto-merge & sync guide
+├── docs/
+│   ├── adr/                                     # Architecture Decision Records (ADR 0001)
+│   └── setup.md                                 # Setup, models, branch protection, auto-merge & sync guide
 ├── scripts/
+│   ├── evaluate_run.py                          # Post-merge evaluation runner
+│   ├── evaluator.py                             # Lesson extraction against quality rubrics
 │   ├── init.sh                                  # Idempotent `template init` bootstrap script
+│   ├── memory_store.py                          # Process-safe memory store client with flock
+│   ├── routine_maker.py                         # Synthesizes patterns into skill PRs
 │   ├── setup-labels.sh                          # Idempotent GitHub labels script (+ Linear note)
 │   ├── setup-models.sh                          # Model setup script (writes models.yml)
 │   ├── setup-models                             # Executable symlink to setup-models.sh
@@ -152,6 +161,10 @@ Committed defaults: `builder: gemini-3.8-flash-high`, `auditor: grok-4.7`, and `
 │   ├── validate_models.py                       # Validates models.yml against models.allowed.yml
 │   └── validate-models.py                       # Executable symlink to validate_models.py
 └── tests/
+    ├── test_evaluate_run.py                     # Tests for post-merge PR evaluation
+    ├── test_evaluator.py                        # Tests for lesson extraction and rubrics
+    ├── test_memory_store.py                     # Tests for atomic appending and locking
     ├── test_models.py                           # Tests for models.yml validation & CLI setup
-    └── test_notify_grok.py                      # Tests for webhook payload & duplicate prevention
+    ├── test_notify_grok.py                      # Tests for webhook payload & duplicate prevention
+    └── test_routine_maker.py                    # Tests for Receipt of Causality generation
 ```
