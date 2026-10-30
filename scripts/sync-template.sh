@@ -22,6 +22,7 @@
 #   --base <base-branch>     Base branch in target repo (default: main)
 #   --source-dir <path>      Optional local template checkout (for testing; skips gh repo clone)
 #   --dry-run                Print diff summary and revert without creating a branch or PR
+#   --no-push                Commit changes to branch locally without pushing or creating a PR
 #   --allow-template-self    Allow syncing when the target repo IS the template repo (used with --dry-run)
 #   -h, --help               Show this help message
 
@@ -43,6 +44,7 @@ SYNC_BRANCH=""
 BASE_BRANCH=""
 SOURCE_DIR=""
 DRY_RUN=0
+NO_PUSH=0
 ALLOW_SELF=0
 
 while [ "$#" -gt 0 ]; do
@@ -77,6 +79,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --dry-run)
       DRY_RUN=1
+      shift
+      ;;
+    --no-push)
+      NO_PUSH=1
       shift
       ;;
     --allow-template-self)
@@ -364,6 +370,12 @@ git checkout -B "$SYNC_BRANCH"
 
 git add -A
 git commit -m "chore(template): sync factory template @ $SHORT_SHA"
+
+if [ "$NO_PUSH" -eq 1 ]; then
+  echo ""
+  echo "✅ Template sync complete locally (--no-push). Changes committed to '$SYNC_BRANCH'."
+  exit 0
+fi
 
 echo "🚀 Pushing '$SYNC_BRANCH' to origin..."
 git push -u origin "$SYNC_BRANCH" --force-with-lease
