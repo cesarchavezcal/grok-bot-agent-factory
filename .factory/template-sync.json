@@ -14,11 +14,13 @@
     "skills-lock.json",
     ".factory/work-item.schema.json",
     ".factory/WORK-ITEM.example.json",
+    ".factory/schemas/*",
     "models.allowed.yml"
   ],
   "preserveLocalPaths": [
     ".factory/config.json",
     ".factory/work-items",
+    ".factory/memory",
     ".agents/skills/verify-app/features",
     "models.yml"
   ]

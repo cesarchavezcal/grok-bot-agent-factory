@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/cesarchavezcal/grok-bot-agent-factory/schemas/memory/patterns.schema.json",
+  "title": "FactoryPatternIndex",
+  "description": "Aggregated pattern index tracking failure repetitions across skills for RoutineMaker synthesis",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "updatedAt",
+    "threshold",
+    "patterns"
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Semantic version of patterns index schema"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp when pattern index was last updated"
+    },
+    "threshold": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 3,
+      "description": "Repetition count threshold required to trigger readyForRoutineMaker"
+    },
+    "patterns": {
+      "type": "object",
+      "description": "Dictionary of aggregated pattern entries indexed by composite key <failureClass>::<targetSkill>",
+      "patternProperties": {
+        "^.+::.+$": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "patternId",
+            "failureClass",
+            "targetSkill",
+            "count",
+            "lessonIds",
+            "readyForRoutineMaker",
+            "firstSeen",
+            "lastSeen"
+          ],
+          "properties": {
+            "patternId": {
+              "type": "string",
+              "description": "Composite identifier matching <failureClass>::<targetSkill>"
+            },
+            "failureClass": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Taxonomy class of failure"
+            },
+            "targetSkill": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Target skill name"
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Total count of observed lesson occurrences"
+            },
+            "lessonIds": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^les-[a-zA-Z0-9_-]+$"
+              },
+              "uniqueItems": true,
+              "minItems": 1,
+              "description": "Deduplicated list of lesson IDs contributing to this pattern"
+            },
+            "readyForRoutineMaker": {
+              "type": "boolean",
+              "description": "True when count >= threshold and pattern is eligible for automated routine synthesis"
+            },
+            "firstSeen": {
+              "type": "string",
+              "format": "date-time",
+              "description": "ISO 8601 UTC timestamp of first observed lesson"
+            },
+            "lastSeen": {
+              "type": "string",
+              "format": "date-time",
+              "description": "ISO 8601 UTC timestamp of most recent observed lesson"
+            },
+            "rubricsViolated": {
+              "type": "array",
+              "items": { "type": "string" },
+              "uniqueItems": true,
+              "description": "Distinct list of rubrics violated across associated lessons"
+            },
+            "routineId": {
+              "type": ["string", "null"],
+              "description": "Identifier or file path of synthesized routine/test/rule once promoted"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["observing", "threshold_reached", "routine_synthesized", "archived"],
+              "default": "observing",
+              "description": "Lifecycle state of pattern"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

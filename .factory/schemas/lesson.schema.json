@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/cesarchavezcal/grok-bot-agent-factory/schemas/memory/lesson.schema.json",
+  "title": "FactoryLessonRecord",
+  "description": "Schema for an atomic lesson record appended to .factory/memory/lessons.jsonl",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "timestamp",
+    "workItemId",
+    "prUrl",
+    "targetSkill",
+    "failureClass",
+    "rubricViolated",
+    "evidenceSummary",
+    "status"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^les-[a-zA-Z0-9_-]+$",
+      "description": "Unique lesson identifier"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp of lesson creation"
+    },
+    "workItemId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Associated work-item identifier matching FactoryWorkItem schema"
+    },
+    "prUrl": {
+      "type": ["string", "null"],
+      "format": "uri",
+      "description": "Pull request URL where failure occurred, or null if pre-PR"
+    },
+    "targetSkill": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Skill executing when defect surfaced"
+    },
+    "failureClass": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Taxonomy classification of failure"
+    },
+    "rubricViolated": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Specific rubric or rule violated"
+    },
+    "evidenceSummary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8192,
+      "description": "Concise summary of failure critique, stack trace, or audit findings"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "promoted", "ignored", "resolved", "staged"],
+      "default": "active",
+      "description": "Lifecycle status of lesson"
+    }
+  }
+}
